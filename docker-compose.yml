@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # 服务 1: FastAPI 推荐接口
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app  # 核心细节：挂载本地目录。这样队友修改代码后不用重启容器，立刻生效！
+    depends_on:
+      - postgres_db # 确保数据库先启动
+
+  # 服务 2: PostgreSQL 数据库
+  postgres_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: jellyfin_user
+      POSTGRES_PASSWORD: jellyfin_password
+      POSTGRES_DB: recommender_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data # 数据持久化，防止容器重启后数据清空
+
+volumes:
+  pgdata:
