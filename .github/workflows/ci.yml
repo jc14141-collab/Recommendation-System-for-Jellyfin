@@ -1,0 +1,30 @@
+name: MLOps CI Pipeline
+
+# 触发条件：当有人往主分支 push 代码，或者发起 Pull Request 时触发
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  test-pipeline:
+    runs-on: ubuntu-latest # 在 GitHub 的云端 Ubuntu 服务器上运行
+
+    steps:
+    - name: 1. 下载最新代码 (Checkout)
+      uses: actions/checkout@v3
+
+    - name: 2. 配置 Python 环境 (3.10)
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+
+    - name: 3. 安装依赖 (Install Dependencies)
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: 4. 运行全局 Dummy Pipeline 测试
+      run: |
+        python pipeline/main_pipeline.py
