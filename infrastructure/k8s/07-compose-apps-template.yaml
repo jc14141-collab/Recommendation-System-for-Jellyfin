@@ -1,0 +1,23 @@
+# 07-compose-apps-template.yaml: templates for compose-defined app services that still need real images
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: compose-apps-template-notes
+  namespace: mlops
+data:
+  README: |
+    The original docker-compose file also defines these services:
+    - bootstraper
+    - pipeline
+    - api
+    - online_service
+    - simulator
+
+    They are not deployed by default from this repository because the current workspace
+    does not include the corresponding build contexts, Dockerfiles, or published image tags.
+
+    Once the owning team provides container images, create Kubernetes Deployments or Jobs
+    that reuse:
+    - postgres service DNS name: postgres.mlops.svc.cluster.local
+    - minio service DNS name: minio.mlops.svc.cluster.local
+    - existing secrets for PostgreSQL and MinIO credentials

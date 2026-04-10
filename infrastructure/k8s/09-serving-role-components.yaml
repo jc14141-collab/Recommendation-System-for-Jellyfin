@@ -1,0 +1,38 @@
+# 09-serving-role-components.yaml: reference mapping for serving-role services from the serving repository
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: serving-role-components
+  namespace: mlops
+data:
+  services: |
+    baseline:
+      kubernetes_equivalent:
+        - Deployment
+        - Service
+      status: planned
+    onnx:
+      kubernetes_equivalent:
+        - Deployment
+        - Service
+      status: planned
+    multiworker:
+      kubernetes_equivalent:
+        - Deployment
+        - Service
+      status: planned
+    onnx_multiworker:
+      kubernetes_equivalent:
+        - Deployment
+        - Service
+      status: planned
+    torch_model:
+      kubernetes_equivalent:
+        - Deployment
+        - Service
+      status: planned
+    torch_multiworker:
+      kubernetes_equivalent:
+        - Deployment
+        - Service
+      status: planned

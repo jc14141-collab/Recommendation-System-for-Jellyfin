@@ -1,0 +1,45 @@
+# 07-data-role-components.yaml: reference mapping for data-role services derived from docker-data.yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-role-components
+  namespace: mlops
+data:
+  services: |
+    minio:
+      kubernetes_equivalent:
+        - Deployment
+        - Service
+        - PersistentVolumeClaim
+      implemented_in_repo: k8s/04-minio.yaml
+    minio-init:
+      kubernetes_equivalent:
+        - Job
+      implemented_in_repo: k8s/05-minio-init.yaml
+    bootstraper:
+      kubernetes_equivalent:
+        - Job or Deployment
+      status: planned
+    pipeline:
+      kubernetes_equivalent:
+        - Job or CronJob
+      status: planned
+    api:
+      kubernetes_equivalent:
+        - Deployment
+        - Service
+      status: planned
+    online_service:
+      kubernetes_equivalent:
+        - Deployment
+        - Service
+      status: planned
+    simulator:
+      kubernetes_equivalent:
+        - Deployment or Job
+      status: planned
+    adminer:
+      kubernetes_equivalent:
+        - Deployment
+        - Service
+      implemented_in_repo: k8s/06-adminer.yaml

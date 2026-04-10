@@ -26,18 +26,26 @@ The current repository reflects a working initial deployment for early integrati
 
 ## Services Deployed
 
-- PostgreSQL: platform service for persistent relational storage.
-- MLflow: platform service for experiment tracking and artifact management.
-- Jellyfin: open-source service used by the project and deployed in Kubernetes for demonstration.
-- MinIO: S3-compatible object storage used by data engineering services.
-- Adminer: lightweight database UI for PostgreSQL debugging.
+- PostgreSQL
+  Platform service for persistent relational storage used by project components that require online state.
+- MLflow
+  Platform service for experiment tracking and artifact management. In this repository, MLflow stores metadata in PostgreSQL and artifacts on a PVC-backed filesystem path.
+- Jellyfin
+  Open-source service used by the project and deployed in Kubernetes for demonstration.
+- MinIO
+  S3-compatible object storage used by the data engineering services defined in the compose file.
+- Adminer
+  Lightweight database UI for inspecting PostgreSQL during integration and debugging.
 
 ## Networking Model
+
+The current initial deployment uses a simple service exposure model:
 
 - PostgreSQL uses `ClusterIP` and is intended for internal cluster access only.
 - MLflow uses `NodePort` `30500`.
 - Jellyfin uses `NodePort` `30096`.
-- No dedicated Ingress manifest is included in this initial deployment. NodePort is used for demonstration access.
+
+No dedicated Ingress manifest is included in this initial deployment. `NodePort` is used as the external access method where browser access is needed for demonstration and validation.
 
 ## Persistent Storage
 
@@ -48,35 +56,84 @@ Persistent storage is implemented using the default K3s `local-path` storage cla
 - Jellyfin defines a PVC for configuration retention.
 - MinIO defines a PVC for object storage data.
 
-These services rely on persistent volumes so that state and configuration survive pod restart events. In this initial deployment, persistence is scoped to node-local storage behavior provided by `local-path`.
+These services rely on persistent volumes so that state and configuration survive pod restart events. In this initial deployment, persistence is scoped to the node-local storage behavior provided by `local-path`.
 
 ## Repository Structure
 
-The full infrastructure package is attached at:
-
-- `infrastructure/infrastructure-submission.zip`
-
-Inside the package:
-
-- `k8s/` contains Kubernetes manifests for namespace creation and service deployment.
-- `scripts/` contains K3s, deployment, and secret creation helpers.
-- `docs/` contains container inventory, sizing notes, and deployment notes.
+- `k8s/`
+  Kubernetes manifests for namespace creation and service deployment.
+- `scripts/`
+  Utility scripts for K3s installation, worker join, token lookup, and Kubernetes secret creation.
+- `docs/`
+  Submission-oriented documentation, including container inventory, infrastructure sizing notes, and deployment/provisioning notes.
 
 ## Deployment Order
 
+The repository supports the following initial deployment workflow:
+
 1. Provision or access a Chameleon node.
 2. Install K3s on the primary node using `scripts/install-k3s-server.sh`.
-3. Create the Kubernetes namespace with `k8s/00-namespace.yaml`.
-4. Create the PostgreSQL secret separately using `scripts/create-postgres-secret.sh`.
-5. Apply PostgreSQL, MLflow, and Jellyfin manifests.
-6. If needed, create the MinIO secret and apply MinIO/Adminer manifests.
+3. If additional nodes are used, join them with `scripts/install-k3s-agent.sh`.
+4. Create the Kubernetes namespace with `k8s/00-namespace.yaml`.
+5. Create the PostgreSQL secret separately using `scripts/create-postgres-secret.sh`.
+6. Apply `k8s/01-postgres.yaml`.
+7. Apply `k8s/02-mlflow.yaml`.
+8. Apply `k8s/03-jellyfin.yaml`.
+9. If the data stack is needed, create the MinIO secret with `scripts/create-minio-secret.sh`.
+10. Apply `k8s/04-minio.yaml`, `k8s/05-minio-init.yaml`, and `k8s/06-adminer.yaml`.
 
-Some Chameleon instance provisioning actions, such as launching the instance, assigning a floating IP, and confirming security group rules, may be performed manually through the Chameleon environment.
+The Chameleon instance provisioning and access steps may include manual actions in the Chameleon environment, such as launching the instance, assigning a floating IP, and confirming security group rules. This repository documents and supports the Kubernetes-side deployment after node access is available.
 
 ## Security Note
 
-Real secrets are not stored in this repository. PostgreSQL and MinIO credentials must be created separately at deployment time using environment variables or equivalent secret management workflows.
+Real secrets are not stored in this repository.
+
+- PostgreSQL credentials must be created separately at deployment time.
+- `scripts/create-postgres-secret.sh` provides an example mechanism for creating the required Kubernetes secret from environment variables.
+- No real password or sensitive credential should be committed into Git.
 
 ## Submission Note
 
-This infrastructure package is intended to support course submission as initial Chameleon + K3s deployment material for the DevOps / Platform role.
+This repository is intended to be packaged and uploaded as infrastructure and deployment material for course submission. It includes the cluster setup scripts, Kubernetes manifests, and supporting documentation needed to explain the initial Chameleon + K3s deployment of the project services.
+
+## Quick Deployment Example
+
+After SSH access to a Chameleon node is available:
+
+```bash
+chmod +x scripts/*.sh
+sudo ./scripts/install-k3s-server.sh
+kubectl apply -f k8s/00-namespace.yaml
+export POSTGRES_PASSWORD="replace-with-a-real-password"
+./scripts/create-postgres-secret.sh
+kubectl apply -f k8s/01-postgres.yaml
+kubectl apply -f k8s/02-mlflow.yaml
+kubectl apply -f k8s/03-jellyfin.yaml
+export MINIO_ROOT_USER="minioadmin"
+export MINIO_ROOT_PASSWORD="replace-with-a-real-password"
+./scripts/create-minio-secret.sh
+kubectl apply -f k8s/04-minio.yaml
+kubectl apply -f k8s/05-minio-init.yaml
+kubectl apply -f k8s/06-adminer.yaml
+kubectl get pods -n mlops
+kubectl get svc -n mlops
+kubectl get pvc -n mlops
+```
+
+If you are deploying from a local Windows PowerShell terminal to a Chameleon instance, you can also run:
+
+```powershell
+.\scripts\deploy-chameleon.ps1 -FloatingIp 129.114.25.219 -PostgresPassword "replace-with-a-real-password"
+```
+
+This helper script copies the repository to the remote node, installs K3s unless `-SkipK3sInstall` is supplied, creates the PostgreSQL secret, applies the manifests, and waits for PostgreSQL, MLflow, and Jellyfin to become ready.
+
+Expected external endpoints for the initial deployment:
+
+- MLflow: `http://<floating-ip>:30500`
+- Jellyfin: `http://<floating-ip>:30096`
+- MinIO API: `http://<floating-ip>:30900`
+- MinIO Console: `http://<floating-ip>:30901`
+- Adminer: `http://<floating-ip>:30050`
+
+PostgreSQL is intended for internal service access inside the cluster.

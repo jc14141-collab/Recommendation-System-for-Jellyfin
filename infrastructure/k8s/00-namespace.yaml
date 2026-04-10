@@ -1,0 +1,5 @@
+# 00-namespace.yaml: shared namespace for the initial project deployment
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops

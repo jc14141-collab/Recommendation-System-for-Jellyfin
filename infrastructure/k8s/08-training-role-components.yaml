@@ -1,0 +1,20 @@
+# 08-training-role-components.yaml: reference mapping for training-role containerization inputs
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: training-role-components
+  namespace: mlops
+data:
+  services: |
+    trainer:
+      docker_source:
+        - ../../docker-training
+        - ../../train.py
+        - ../../config.yaml
+      kubernetes_equivalent:
+        - Job
+        - CronJob
+      integration_targets:
+        - mlflow
+        - minio
+      status: planned
