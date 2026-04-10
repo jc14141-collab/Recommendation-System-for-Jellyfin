@@ -1,0 +1,46 @@
+# 10-devops-platform-components.yaml: reference mapping for DevOps / Platform owned services
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devops-platform-components
+  namespace: mlops
+data:
+  services: |
+    namespace:
+      kubernetes_equivalent:
+        - Namespace
+      implemented_in_repo: k8s/00-namespace.yaml
+    postgres:
+      kubernetes_equivalent:
+        - ConfigMap
+        - PersistentVolumeClaim
+        - Service
+        - StatefulSet
+      implemented_in_repo: k8s/01-postgres.yaml
+    mlflow:
+      kubernetes_equivalent:
+        - PersistentVolumeClaim
+        - Service
+        - Deployment
+      implemented_in_repo: k8s/02-mlflow.yaml
+    jellyfin:
+      kubernetes_equivalent:
+        - PersistentVolumeClaim
+        - Service
+        - Deployment
+      implemented_in_repo: k8s/03-jellyfin.yaml
+    minio:
+      kubernetes_equivalent:
+        - PersistentVolumeClaim
+        - Service
+        - Deployment
+      implemented_in_repo: k8s/04-minio.yaml
+    minio-init:
+      kubernetes_equivalent:
+        - Job
+      implemented_in_repo: k8s/05-minio-init.yaml
+    adminer:
+      kubernetes_equivalent:
+        - Service
+        - Deployment
+      implemented_in_repo: k8s/06-adminer.yaml
