@@ -1,0 +1,76 @@
+# 03-jellyfin.yaml: Jellyfin open-source service with PVC-backed configuration and NodePort exposure
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jellyfin-config
+  namespace: mlops
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jellyfin
+  namespace: mlops
+spec:
+  selector:
+    app: jellyfin
+  ports:
+    - name: http
+      port: 8096
+      targetPort: 8096
+      nodePort: 30096
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jellyfin
+  namespace: mlops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jellyfin
+  template:
+    metadata:
+      labels:
+        app: jellyfin
+    spec:
+      containers:
+        - name: jellyfin
+          image: jellyfin/jellyfin:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8096
+              name: http
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          volumeMounts:
+            - name: jellyfin-config
+              mountPath: /config
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8096
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8096
+            initialDelaySeconds: 40
+            periodSeconds: 15
+      volumes:
+        - name: jellyfin-config
+          persistentVolumeClaim:
+            claimName: jellyfin-config
