@@ -1,0 +1,71 @@
+name: Training CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - "training/**"
+      - "infrastructure/k8s/08-training-job.yaml"
+      - ".github/workflows/training-ci.yml"
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/project25-training
+
+jobs:
+  build-and-run-training:
+    if: ${{ hashFiles('training/Dockerfile') != '' && hashFiles('infrastructure/k8s/08-training-job.yaml') != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build and push training image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./training
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "latest"
+
+      - name: Load kubeconfig
+        shell: bash
+        run: |
+          mkdir -p "${HOME}/.kube"
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > "${HOME}/.kube/config"
+          chmod 600 "${HOME}/.kube/config"
+
+      - name: Trigger training job
+        shell: bash
+        run: |
+          kubectl delete job recommender-training -n mlops --ignore-not-found
+          sed "s|project25-training:latest|${IMAGE_NAME}:${GITHUB_SHA}|g" infrastructure/k8s/08-training-job.yaml | kubectl apply -f -
+          kubectl get jobs -n mlops
+
+  training-workflow-placeholder:
+    if: ${{ hashFiles('training/Dockerfile') == '' || hashFiles('infrastructure/k8s/08-training-job.yaml') == '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain why training CI was skipped
+        run: |
+          echo "Training CI is defined but skipped because the repo does not yet contain both:"
+          echo " - training/Dockerfile"
+          echo " - infrastructure/k8s/08-training-job.yaml"
+          echo "Add those files to activate the workflow."

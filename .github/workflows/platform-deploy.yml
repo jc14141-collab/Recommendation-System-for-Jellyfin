@@ -1,0 +1,57 @@
+name: Platform Deploy
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - "infrastructure/k8s/**"
+      - "infrastructure/scripts/**"
+      - ".github/workflows/platform-deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy-platform:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "latest"
+
+      - name: Load kubeconfig
+        shell: bash
+        run: |
+          mkdir -p "${HOME}/.kube"
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > "${HOME}/.kube/config"
+          chmod 600 "${HOME}/.kube/config"
+
+      - name: Deploy shared platform services
+        shell: bash
+        run: |
+          kubectl apply -f infrastructure/k8s/00-namespace.yaml
+          kubectl apply -f infrastructure/k8s/01-postgres.yaml
+          kubectl apply -f infrastructure/k8s/02-mlflow.yaml
+          kubectl apply -f infrastructure/k8s/03-jellyfin.yaml
+          kubectl apply -f infrastructure/k8s/04-minio.yaml
+          kubectl delete job minio-init -n mlops --ignore-not-found
+          kubectl apply -f infrastructure/k8s/05-minio-init.yaml
+          kubectl apply -f infrastructure/k8s/06-adminer.yaml
+
+      - name: Wait for rollouts
+        shell: bash
+        run: |
+          kubectl rollout status statefulset/postgres -n mlops --timeout=300s
+          kubectl rollout status deployment/mlflow -n mlops --timeout=300s
+          kubectl rollout status deployment/jellyfin -n mlops --timeout=300s
+          kubectl rollout status deployment/minio -n mlops --timeout=300s
+          kubectl rollout status deployment/adminer -n mlops --timeout=300s
+          kubectl wait --for=condition=complete job/minio-init -n mlops --timeout=300s
+
+      - name: Show cluster status
+        shell: bash
+        run: |
+          kubectl get pods,svc,pvc,jobs -n mlops
