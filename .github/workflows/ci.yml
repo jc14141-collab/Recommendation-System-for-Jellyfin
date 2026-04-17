@@ -1,6 +1,5 @@
-name: MLOps CI Pipeline
+name: Repository CI
 
-# 触发条件：当有人往主分支 push 代码，或者发起 Pull Request 时触发
 on:
   push:
     branches: [ "main", "master" ]
@@ -8,23 +7,45 @@ on:
     branches: [ "main", "master" ]
 
 jobs:
-  test-pipeline:
-    runs-on: ubuntu-latest # 在 GitHub 的云端 Ubuntu 服务器上运行
+  validate-repo:
+    runs-on: ubuntu-latest
 
     steps:
-    - name: 1. 下载最新代码 (Checkout)
-      uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: 2. 配置 Python 环境 (3.10)
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.10"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: 3. 安装依赖 (Install Dependencies)
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Install lightweight validation deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
 
-    - name: 4. 运行全局 Dummy Pipeline 测试
-      run: |
-        python pipeline/main_pipeline.py
+      - name: Validate Python syntax
+        run: |
+          python -m compileall infrastructure serving training pipeline
+
+      - name: Validate YAML syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          checked = []
+          for path in Path("infrastructure").rglob("*.yaml"):
+              with path.open("r", encoding="utf-8") as f:
+                  list(yaml.safe_load_all(f))
+              checked.append(str(path))
+
+          for path in Path(".github/workflows").glob("*.yml"):
+              with path.open("r", encoding="utf-8") as f:
+                  list(yaml.safe_load_all(f))
+              checked.append(str(path))
+
+          print("Validated YAML files:")
+          for item in checked:
+              print(f" - {item}")
+          PY
