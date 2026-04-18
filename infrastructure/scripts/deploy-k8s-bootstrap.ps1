@@ -1,0 +1,71 @@
+[CmdletBinding()]
+param(
+    [string]$Namespace = "mlops",
+    [string]$PostgresUser = "postgres",
+    [string]$PostgresPassword = "",
+    [string]$MinioRootUser = "",
+    [string]$MinioRootPassword = "",
+    [string]$Timeout = "300s",
+    [switch]$SkipSecretSetup
+)
+
+$ErrorActionPreference = "Stop"
+
+function Require-Command {
+    param([string]$Name)
+
+    if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
+        throw "Required command '$Name' was not found in PATH."
+    }
+}
+
+function Ensure-Secret {
+    param([string]$Name)
+
+    kubectl get secret $Name -n $Namespace | Out-Null
+}
+
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot = Split-Path -Parent $scriptDir
+$bootstrapDir = Join-Path $repoRoot "k8s\bootstrap"
+
+Require-Command -Name "kubectl"
+
+if (-not $SkipSecretSetup) {
+    if ([string]::IsNullOrWhiteSpace($PostgresPassword)) {
+        throw "PostgresPassword is required unless -SkipSecretSetup is supplied."
+    }
+    if ([string]::IsNullOrWhiteSpace($MinioRootUser) -or [string]::IsNullOrWhiteSpace($MinioRootPassword)) {
+        throw "MinioRootUser and MinioRootPassword are required unless -SkipSecretSetup is supplied."
+    }
+
+    kubectl create namespace $Namespace --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create secret generic postgres-secret `
+        --namespace $Namespace `
+        --from-literal=POSTGRES_USER=$PostgresUser `
+        --from-literal=POSTGRES_PASSWORD=$PostgresPassword `
+        --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create secret generic minio-secret `
+        --namespace $Namespace `
+        --from-literal=MINIO_ROOT_USER=$MinioRootUser `
+        --from-literal=MINIO_ROOT_PASSWORD=$MinioRootPassword `
+        --dry-run=client -o yaml | kubectl apply -f -
+}
+else {
+    kubectl create namespace $Namespace --dry-run=client -o yaml | kubectl apply -f -
+    Ensure-Secret -Name "postgres-secret"
+    Ensure-Secret -Name "minio-secret"
+}
+
+kubectl delete job minio-init -n $Namespace --ignore-not-found | Out-Null
+kubectl apply -k $bootstrapDir
+
+kubectl rollout status statefulset/postgres -n $Namespace --timeout=$Timeout
+kubectl rollout status deployment/mlflow -n $Namespace --timeout=$Timeout
+kubectl rollout status deployment/jellyfin -n $Namespace --timeout=$Timeout
+kubectl rollout status deployment/minio -n $Namespace --timeout=$Timeout
+kubectl wait --for=condition=complete job/minio-init -n $Namespace --timeout=$Timeout
+
+kubectl get pods -n $Namespace
+kubectl get svc -n $Namespace
+kubectl get pvc -n $Namespace
