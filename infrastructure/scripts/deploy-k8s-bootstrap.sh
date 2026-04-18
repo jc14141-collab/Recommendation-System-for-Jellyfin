@@ -70,11 +70,22 @@ done
 
 require_command kubectl
 
+MANIFESTS=(
+  "$REPO_ROOT/k8s/00-namespace.yaml"
+  "$REPO_ROOT/k8s/01-postgres.yaml"
+  "$REPO_ROOT/k8s/02-mlflow.yaml"
+  "$REPO_ROOT/k8s/03-jellyfin.yaml"
+  "$REPO_ROOT/k8s/04-minio.yaml"
+  "$REPO_ROOT/k8s/05-minio-init.yaml"
+)
+
 if kubectl kustomize "$BOOTSTRAP_DIR" >/dev/null 2>&1; then
-  KUSTOMIZE_COMMAND=(kubectl apply -k "$BOOTSTRAP_DIR")
+  APPLY_COMMAND=(kubectl apply -k "$BOOTSTRAP_DIR")
 else
-  echo "kubectl kustomize support was not detected. Install a kubectl build with kustomize support." >&2
-  exit 1
+  APPLY_COMMAND=(kubectl apply)
+  for manifest in "${MANIFESTS[@]}"; do
+    APPLY_COMMAND+=(-f "$manifest")
+  done
 fi
 
 if [[ "$SKIP_SECRET_SETUP" != "true" ]]; then
@@ -98,7 +109,7 @@ else
 fi
 
 kubectl delete job minio-init -n "$NAMESPACE" --ignore-not-found >/dev/null
-"${KUSTOMIZE_COMMAND[@]}"
+"${APPLY_COMMAND[@]}"
 
 kubectl rollout status statefulset/postgres -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 kubectl rollout status deployment/mlflow -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"

@@ -28,6 +28,14 @@ function Ensure-Secret {
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptDir
 $bootstrapDir = Join-Path $repoRoot "k8s\bootstrap"
+$manifests = @(
+    (Join-Path $repoRoot "k8s\00-namespace.yaml"),
+    (Join-Path $repoRoot "k8s\01-postgres.yaml"),
+    (Join-Path $repoRoot "k8s\02-mlflow.yaml"),
+    (Join-Path $repoRoot "k8s\03-jellyfin.yaml"),
+    (Join-Path $repoRoot "k8s\04-minio.yaml"),
+    (Join-Path $repoRoot "k8s\05-minio-init.yaml")
+)
 
 Require-Command -Name "kubectl"
 
@@ -58,7 +66,15 @@ else {
 }
 
 kubectl delete job minio-init -n $Namespace --ignore-not-found | Out-Null
-kubectl apply -k $bootstrapDir
+kubectl kustomize $bootstrapDir *> $null
+if ($LASTEXITCODE -eq 0) {
+    kubectl apply -k $bootstrapDir
+}
+else {
+    foreach ($manifest in $manifests) {
+        kubectl apply -f $manifest
+    }
+}
 
 kubectl rollout status statefulset/postgres -n $Namespace --timeout=$Timeout
 kubectl rollout status deployment/mlflow -n $Namespace --timeout=$Timeout
