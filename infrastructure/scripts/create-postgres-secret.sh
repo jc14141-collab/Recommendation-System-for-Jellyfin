@@ -2,7 +2,7 @@
 set -euo pipefail
 
 NAMESPACE="${NAMESPACE:-mlops}"
-POSTGRES_USER="${POSTGRES_USER:-postgres}"
+POSTGRES_USER="${POSTGRES_USER:-recsys}"
 
 if [[ -z "${POSTGRES_PASSWORD:-}" ]]; then
   echo "Set POSTGRES_PASSWORD before running this script."

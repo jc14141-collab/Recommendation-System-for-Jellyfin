@@ -26,6 +26,7 @@ Environment variables:
   SKIP_SECRET_SETUP    Set to true to skip secret creation helpers
 
 If secret setup is not skipped:
+  - POSTGRES_USER defaults to recsys
   - POSTGRES_PASSWORD is required
   - MINIO_ROOT_USER and MINIO_ROOT_PASSWORD are required
 EOF
@@ -98,7 +99,7 @@ if [[ "$SKIP_SECRET_SETUP" != "true" ]]; then
     exit 1
   fi
 
-  NAMESPACE="$NAMESPACE" POSTGRES_PASSWORD="$POSTGRES_PASSWORD" POSTGRES_USER="${POSTGRES_USER:-postgres}" \
+  NAMESPACE="$NAMESPACE" POSTGRES_PASSWORD="$POSTGRES_PASSWORD" POSTGRES_USER="${POSTGRES_USER:-recsys}" \
     "$SCRIPT_DIR/create-postgres-secret.sh"
   NAMESPACE="$NAMESPACE" MINIO_ROOT_USER="$MINIO_ROOT_USER" MINIO_ROOT_PASSWORD="$MINIO_ROOT_PASSWORD" \
     "$SCRIPT_DIR/create-minio-secret.sh"

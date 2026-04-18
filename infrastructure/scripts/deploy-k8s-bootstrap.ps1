@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Namespace = "mlops",
-    [string]$PostgresUser = "postgres",
+    [string]$PostgresUser = "recsys",
     [string]$PostgresPassword = "",
     [string]$MinioRootUser = "",
     [string]$MinioRootPassword = "",
