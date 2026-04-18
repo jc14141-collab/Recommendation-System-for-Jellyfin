@@ -1,4 +1,4 @@
-# 01-postgres.yaml: PostgreSQL platform service with init SQL, PVC, Service, and StatefulSet
+# 01-postgres.yaml: PostgreSQL platform service with init SQL, local host storage, Service, and StatefulSet
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,18 +8,6 @@ data:
   01-init.sql: |
     CREATE DATABASE recommender;
     CREATE DATABASE mlflow;
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: postgres-data
-  namespace: mlops
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 20Gi
 ---
 apiVersion: v1
 kind: Service
@@ -69,8 +57,6 @@ spec:
                 secretKeyRef:
                   name: postgres-secret
                   key: POSTGRES_PASSWORD
-            - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
           resources:
             requests:
               cpu: 500m
@@ -104,5 +90,6 @@ spec:
           configMap:
             name: postgres-initdb
         - name: postgres-data
-          persistentVolumeClaim:
-            claimName: postgres-data
+          hostPath:
+            path: /mnt/block/postgres_data
+            type: DirectoryOrCreate

@@ -1,4 +1,4 @@
-# 06-adminer.yaml: Adminer database UI exposed through NodePort
+# 06-adminer.yaml: Adminer database UI exposed through host port 5050
 apiVersion: v1
 kind: Service
 metadata:
@@ -11,8 +11,7 @@ spec:
     - name: http
       port: 8080
       targetPort: 8080
-      nodePort: 30050
-  type: NodePort
+  type: ClusterIP
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -38,6 +37,7 @@ spec:
               value: postgres
           ports:
             - containerPort: 8080
+              hostPort: 5050
               name: http
           resources:
             requests:
