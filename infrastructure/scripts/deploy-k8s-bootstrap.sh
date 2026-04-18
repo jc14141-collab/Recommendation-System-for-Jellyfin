@@ -12,13 +12,14 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/deploy-k8s-bootstrap.sh [--skip-secret-setup] [--timeout 300s]
 
-Deploy the first six Kubernetes manifests in one pass:
+Deploy the first seven Kubernetes manifests in one pass:
   00-namespace.yaml
   01-postgres.yaml
   02-mlflow.yaml
   03-jellyfin.yaml
   04-minio.yaml
   05-minio-init.yaml
+  06-adminer.yaml
 
 Environment variables:
   NAMESPACE            Target namespace. Default: mlops
@@ -78,6 +79,7 @@ MANIFESTS=(
   "$REPO_ROOT/k8s/03-jellyfin.yaml"
   "$REPO_ROOT/k8s/04-minio.yaml"
   "$REPO_ROOT/k8s/05-minio-init.yaml"
+  "$REPO_ROOT/k8s/06-adminer.yaml"
 )
 
 if kubectl kustomize "$BOOTSTRAP_DIR" >/dev/null 2>&1; then
@@ -116,6 +118,7 @@ kubectl rollout status statefulset/postgres -n "$NAMESPACE" --timeout="$WAIT_TIM
 kubectl rollout status deployment/mlflow -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 kubectl rollout status deployment/jellyfin -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 kubectl rollout status deployment/minio -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
+kubectl rollout status deployment/adminer -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 kubectl wait --for=condition=complete job/minio-init -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 
 kubectl get pods -n "$NAMESPACE"

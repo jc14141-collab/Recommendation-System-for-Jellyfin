@@ -74,8 +74,7 @@ The repository supports the following initial deployment workflow:
 1. Provision or access a Chameleon node.
 2. Install K3s on the primary node using `scripts/install-k3s-server.sh`.
 3. If additional nodes are used, join them with `scripts/install-k3s-agent.sh`.
-4. Deploy the base shared services by applying `k8s/bootstrap`, which bundles `00-namespace.yaml` through `05-minio-init.yaml`.
-5. Apply `k8s/06-adminer.yaml` if the database UI is needed.
+4. Deploy the base shared services by applying `k8s/bootstrap`, which bundles `00-namespace.yaml` through `06-adminer.yaml`.
 
 The Chameleon instance provisioning and access steps may include manual actions in the Chameleon environment, such as launching the instance, assigning a floating IP, and confirming security group rules. This repository documents and supports the Kubernetes-side deployment after node access is available.
 
@@ -93,7 +92,7 @@ This repository is intended to be packaged and uploaded as infrastructure and de
 
 ## Automated Bootstrap
 
-For day-to-day operations, the recommended path is to deploy the first six manifests as one unit through the bootstrap kustomization.
+For day-to-day operations, the recommended path is to deploy the first seven manifests as one unit through the bootstrap kustomization.
 
 From a Linux shell with `kubectl` configured for the target cluster:
 
@@ -109,9 +108,9 @@ export MINIO_ROOT_PASSWORD="replace-with-a-real-password"
 The bootstrap script:
 
 - creates or updates `postgres-secret` and `minio-secret`
-- applies `k8s/bootstrap`, which includes `00-namespace.yaml` through `05-minio-init.yaml`
+- applies `k8s/bootstrap`, which includes `00-namespace.yaml` through `06-adminer.yaml`
 - recreates the one-shot `minio-init` job cleanly
-- waits for PostgreSQL, MLflow, Jellyfin, and MinIO to become ready
+- waits for PostgreSQL, MLflow, Jellyfin, MinIO, and Adminer to become ready
 
 If the secrets already exist in the cluster, you can skip secret creation:
 
@@ -129,12 +128,6 @@ From Windows PowerShell:
   -MinioRootPassword "replace-with-a-real-password"
 ```
 
-After the bootstrap finishes, apply Adminer separately if needed:
-
-```bash
-kubectl apply -f k8s/06-adminer.yaml
-```
-
 ## Quick Deployment Example
 
 After SSH access to a Chameleon node is available:
@@ -147,7 +140,6 @@ export POSTGRES_PASSWORD="replace-with-a-real-password"
 export MINIO_ROOT_USER="minioadmin"
 export MINIO_ROOT_PASSWORD="replace-with-a-real-password"
 ./scripts/deploy-k8s-bootstrap.sh
-kubectl apply -f k8s/06-adminer.yaml
 kubectl get pods -n mlops
 kubectl get svc -n mlops
 kubectl get pvc -n mlops

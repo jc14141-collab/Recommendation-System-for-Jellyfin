@@ -8,3 +8,4 @@ resources:
   - ../03-jellyfin.yaml
   - ../04-minio.yaml
   - ../05-minio-init.yaml
+  - ../06-adminer.yaml
