@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simulator
+  namespace: mlops
+  labels:
+    app: simulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simulator
+  template:
+    metadata:
+      labels:
+        app: simulator
+    spec:
+      initContainers:
+        - name: wait-api
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z api 8080; do echo "waiting for api:8080"; sleep 2; done
+      containers:
+        - name: simulator
+          image: songchenxue/simulator:v1.0
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command:
+            - python
+            - scripts/main.py
+            - --config
+            - scripts/config.yaml
+          env:
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: MINIO_ENDPOINT
+              value: http://minio:9000
+            - name: POSTGRES_PORT
+              value: "5432"
+          envFrom:
+            - secretRef:
+                name: data-pipeline-secrets
+            - configMapRef:
+                name: data-pipeline-config
+          volumeMounts:
+            - name: embedding
+              mountPath: /data/embedding
+            - name: simulator-config
+              mountPath: /app/scripts/config.yaml
+              subPath: config.yaml
+      volumes:
+        - name: embedding
+          hostPath:
+            path: /mnt/block/embedding
+            type: Directory
+        - name: simulator-config
+          configMap:
+            name: simulator-config
+            items:
+              - key: config.yaml
+                path: config.yaml
