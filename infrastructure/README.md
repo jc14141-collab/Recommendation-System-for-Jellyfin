@@ -113,6 +113,34 @@ The bootstrap script:
 - recreates the one-shot `minio-init` job cleanly
 - waits for PostgreSQL, MLflow, Jellyfin, MinIO, and Adminer to become ready
 
+## Training Deployment
+
+Training is deployed separately from the infrastructure bootstrap. The current training-layer resources are:
+
+- `14-training-config.yaml`
+- `15-training-manager.yaml`
+- `16-training-retrain-cronjob.yaml`
+
+The training deployment assumes:
+
+- infrastructure bootstrap has already completed
+- `minio-secret` already exists in `mlops`
+- the image `jellyfin-training:latest` has already been built from `training/Dockerfile` and is available to the node
+
+From a Linux shell with `kubectl` configured for the target cluster:
+
+```bash
+bash ./scripts/deploy-k8s-training.sh
+```
+
+From Windows PowerShell:
+
+```powershell
+.\scripts\deploy-k8s-training.ps1
+```
+
+The training manager service is exposed on NodePort `30089`, and the scheduled retraining CronJob runs daily at `02:00` UTC.
+
 If the secrets already exist in the cluster, you can skip secret creation:
 
 ```bash

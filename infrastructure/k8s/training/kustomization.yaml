@@ -1,0 +1,7 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../14-training-config.yaml
+  - ../15-training-manager.yaml
+  - ../16-training-retrain-cronjob.yaml

@@ -1,0 +1,75 @@
+# 15-training-manager.yaml: training UI and management API
+apiVersion: v1
+kind: Service
+metadata:
+  name: training-manager
+  namespace: mlops
+spec:
+  selector:
+    app: training-manager
+  ports:
+    - name: http
+      port: 8096
+      targetPort: 8096
+      nodePort: 30089
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: training-manager
+  namespace: mlops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: training-manager
+  template:
+    metadata:
+      labels:
+        app: training-manager
+    spec:
+      containers:
+        - name: training-manager
+          image: jellyfin-training:latest
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command:
+            - python
+            - api/server.py
+          envFrom:
+            - configMapRef:
+                name: training-config
+          env:
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_USER
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_PASSWORD
+          ports:
+            - containerPort: 8096
+              name: http
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /api/status
+              port: 8096
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/status
+              port: 8096
+            initialDelaySeconds: 30
+            periodSeconds: 15

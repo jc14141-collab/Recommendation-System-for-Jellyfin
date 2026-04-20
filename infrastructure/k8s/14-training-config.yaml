@@ -1,0 +1,11 @@
+# 14-training-config.yaml: training-layer runtime environment for the training manager API and retrain cronjob
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: training-config
+  namespace: mlops
+data:
+  MLFLOW_TRACKING_URI: http://mlflow.mlops.svc.cluster.local:5000
+  S3_ENDPOINT: http://minio.mlops.svc.cluster.local:9000
+  GIT_PYTHON_REFRESH: quiet
+  SERVING_URL: http://recommender-serving:8000
