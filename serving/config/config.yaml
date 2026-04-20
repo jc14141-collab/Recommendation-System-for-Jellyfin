@@ -1,5 +1,5 @@
 s3:
-  endpoint: "http://10.56.2.170:30900"
+  endpoint: "http://10.56.2.170:30901"
   access_key_id: "minioadmin"
   secret_access_key: "minioadmin123"
   region: "eu-central-1"
