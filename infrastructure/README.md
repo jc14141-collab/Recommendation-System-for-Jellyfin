@@ -169,6 +169,36 @@ If the secrets already exist in the cluster, you can skip secret creation:
 ./scripts/deploy-k8s-bootstrap.sh --skip-secret-setup
 ```
 
+## Serving Deployment
+
+Serving is deployed separately from the infrastructure bootstrap and CI/CD placeholders. The current serving-layer resources are:
+
+- `17-serving-config.yaml`
+- `18-serving-multiworker.yaml`
+
+On the Linux node, prepare the image with:
+
+```bash
+./scripts/import-serving-image.sh
+```
+
+Then deploy the serving layer:
+
+```bash
+bash ./scripts/deploy-k8s-serving.sh
+```
+
+From Windows PowerShell:
+
+```powershell
+.\scripts\deploy-k8s-serving.ps1
+```
+
+This first serving deployment targets the prod multiworker recommender only and exposes:
+
+- internal service: `http://recommender-serving:8000`
+- external NodePort: `http://<node-ip>:30080`
+
 From Windows PowerShell:
 
 ```powershell

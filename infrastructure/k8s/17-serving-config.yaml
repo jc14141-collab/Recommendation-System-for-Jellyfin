@@ -1,0 +1,14 @@
+# 17-serving-config.yaml: serving multiworker configuration for the prod recommender service
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: serving-config
+  namespace: mlops
+data:
+  SERVING_MODE: "model"
+  FALLBACK_POOL_SIZE: "100"
+  FALLBACK_IDS_FILE: "/app/app/fallback_popular_movies.json"
+  MINIO_ENDPOINT: "http://minio:9000"
+  MINIO_BUCKET: "warehouse"
+  ONNX_OBJECT: "models/mlp/prod/model_mlp_best.onnx"
+  MODEL_VERSION: "mlp-prod-onnx"
