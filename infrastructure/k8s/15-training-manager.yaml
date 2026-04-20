@@ -31,8 +31,8 @@ spec:
     spec:
       containers:
         - name: training-manager
-          image: docker.io/library/jellyfin-training:latest
-          imagePullPolicy: Never
+          image: songchenxue/jellyfin-training:latest
+          imagePullPolicy: Always
           workingDir: /app
           command:
             - python

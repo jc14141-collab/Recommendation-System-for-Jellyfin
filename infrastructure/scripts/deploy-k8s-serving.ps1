@@ -26,7 +26,7 @@ Require-Command -Name "kubectl"
 if ((Get-Command sudo -ErrorAction SilentlyContinue) -and (Get-Command crictl -ErrorAction SilentlyContinue)) {
     $runtimeImages = sudo crictl images | Out-String
     if ($runtimeImages -notmatch "project25-serving-multiworker") {
-        throw "Serving image docker.io/library/project25-serving-multiworker:latest was not found in the node runtime. Run ./scripts/import-serving-image.sh on the node first."
+        throw "Serving image songchenxue/project25-serving-multiworker:latest was not found in the node runtime. Run ./scripts/import-serving-image.sh on the node first."
     }
 }
 
@@ -43,6 +43,12 @@ else {
     }
 }
 
+kubectl rollout status deployment/serving-staging -n $Namespace --timeout=$Timeout
+kubectl rollout status deployment/serving-canary -n $Namespace --timeout=$Timeout
 kubectl rollout status deployment/recommender-serving -n $Namespace --timeout=$Timeout
-kubectl get pods -n $Namespace -l app=recommender-serving
-kubectl get svc -n $Namespace recommender-serving
+kubectl rollout status deployment/prometheus -n $Namespace --timeout=$Timeout
+kubectl rollout status deployment/grafana -n $Namespace --timeout=$Timeout
+kubectl rollout status daemonset/node-exporter -n $Namespace --timeout=$Timeout
+
+kubectl get pods -n $Namespace -l "app in (serving-staging,serving-canary,serving-prod,prometheus,grafana,node-exporter)"
+kubectl get svc -n $Namespace serving-staging serving-canary serving-prod recommender-serving prometheus grafana node-exporter

@@ -6,7 +6,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SERVING_DIR="${REPO_ROOT}/k8s/serving"
 NAMESPACE="${NAMESPACE:-mlops}"
 WAIT_TIMEOUT="${WAIT_TIMEOUT:-300s}"
-IMAGE_REF="${IMAGE_REF:-docker.io/library/project25-serving-multiworker:latest}"
+IMAGE_REF="${IMAGE_REF:-songchenxue/project25-serving-multiworker:latest}"
 
 usage() {
   cat <<'EOF'
@@ -23,7 +23,7 @@ Recommended flow:
 Assumptions:
   - namespace mlops already exists
   - minio-secret already exists
-  - the image docker.io/library/project25-serving-multiworker:latest is already imported into the node runtime
+  - the image songchenxue/project25-serving-multiworker:latest is already pushed/imported
 EOF
 }
 
@@ -72,6 +72,12 @@ else
     -f "$REPO_ROOT/k8s/18-serving-multiworker.yaml"
 fi
 
+kubectl rollout status deployment/serving-staging -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
+kubectl rollout status deployment/serving-canary -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 kubectl rollout status deployment/recommender-serving -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
-kubectl get pods -n "$NAMESPACE" -l app=recommender-serving
-kubectl get svc -n "$NAMESPACE" recommender-serving
+kubectl rollout status deployment/prometheus -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
+kubectl rollout status deployment/grafana -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
+kubectl rollout status daemonset/node-exporter -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
+
+kubectl get pods -n "$NAMESPACE" -l 'app in (serving-staging,serving-canary,serving-prod,prometheus,grafana,node-exporter)'
+kubectl get svc -n "$NAMESPACE" serving-staging serving-canary serving-prod recommender-serving prometheus grafana node-exporter
