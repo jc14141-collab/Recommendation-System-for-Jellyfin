@@ -33,6 +33,19 @@ spec:
       labels:
         app: minio
     spec:
+      securityContext:
+        fsGroup: 1000
+      initContainers:  
+      - name: volume-permissions
+        image: busybox:1.36
+        command: ["sh", "-c"]
+        args:
+        - chown -R 1000:1000 /data && chmod -R 755 /data
+        securityContext:
+          allowPrivilegeEscalation: false
+        volumeMounts:
+        - name: minio-data
+          mountPath: /data
       containers:
         - name: minio
           image: minio/minio:latest
@@ -89,5 +102,5 @@ spec:
       volumes:
         - name: minio-data
           hostPath:
-            path: /mnt/block/minio_data
+            path: /mnt/object/minio_data
             type: DirectoryOrCreate
