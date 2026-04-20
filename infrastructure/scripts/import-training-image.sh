@@ -47,5 +47,6 @@ docker push "$IMAGE_REF"
 docker save "$IMAGE_REF" -o "$ARCHIVE_PATH"
 sudo k3s ctr images import "$ARCHIVE_PATH"
 sudo crictl images | grep 'jellyfin-training'
+docker image rm "$IMAGE_REF" jellyfin-training:latest >/dev/null 2>&1 || true
 
 echo "Training image is ready in the node runtime as $IMAGE_REF"

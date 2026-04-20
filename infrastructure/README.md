@@ -198,6 +198,7 @@ This first serving deployment targets the prod multiworker recommender only and 
 
 - internal service: `http://recommender-serving:8000`
 - external NodePort: `http://<node-ip>:30080`
+- image: `songchenxue/project25-serving-multiworker:latest`
 
 From Windows PowerShell:
 

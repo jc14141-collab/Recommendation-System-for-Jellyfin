@@ -35,8 +35,8 @@ spec:
     spec:
       containers:
         - name: recommender-serving
-          image: docker.io/library/project25-serving-multiworker:latest
-          imagePullPolicy: Never
+          image: songchenxue/project25-serving-multiworker:latest
+          imagePullPolicy: Always
           envFrom:
             - configMapRef:
                 name: serving-config

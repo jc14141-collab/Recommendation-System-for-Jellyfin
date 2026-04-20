@@ -26,7 +26,7 @@ Require-Command -Name "kubectl"
 if ((Get-Command sudo -ErrorAction SilentlyContinue) -and (Get-Command crictl -ErrorAction SilentlyContinue)) {
     $runtimeImages = sudo crictl images | Out-String
     if ($runtimeImages -notmatch "project25-serving-multiworker") {
-        throw "Serving image docker.io/library/project25-serving-multiworker:latest was not found in the node runtime. Run ./scripts/import-serving-image.sh on the node first."
+        throw "Serving image songchenxue/project25-serving-multiworker:latest was not found in the node runtime. Run ./scripts/import-serving-image.sh on the node first."
     }
 }
 

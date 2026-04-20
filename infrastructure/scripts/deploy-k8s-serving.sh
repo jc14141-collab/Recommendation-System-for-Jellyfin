@@ -6,7 +6,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SERVING_DIR="${REPO_ROOT}/k8s/serving"
 NAMESPACE="${NAMESPACE:-mlops}"
 WAIT_TIMEOUT="${WAIT_TIMEOUT:-300s}"
-IMAGE_REF="${IMAGE_REF:-docker.io/library/project25-serving-multiworker:latest}"
+IMAGE_REF="${IMAGE_REF:-songchenxue/project25-serving-multiworker:latest}"
 
 usage() {
   cat <<'EOF'
@@ -23,7 +23,7 @@ Recommended flow:
 Assumptions:
   - namespace mlops already exists
   - minio-secret already exists
-  - the image docker.io/library/project25-serving-multiworker:latest is already imported into the node runtime
+  - the image songchenxue/project25-serving-multiworker:latest is already imported into the node runtime
 EOF
 }
 
