@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: serving_staging
+    static_configs:
+      - targets: ["serving-staging:8000"]
+    metrics_path: /metrics
+
+  - job_name: serving_canary
+    static_configs:
+      - targets: ["serving-canary:8000"]
+    metrics_path: /metrics
+
+  - job_name: serving_prod
+    static_configs:
+      - targets: ["serving-prod:8000"]
+    metrics_path: /metrics
+
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]

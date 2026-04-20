@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Namespace = "mlops",
+    [string]$PostgresDb = "recsys",
     [string]$PostgresUser = "recsys",
     [string]$PostgresPassword = "",
     [string]$MinioRootUser = "",
@@ -25,17 +26,45 @@ function Ensure-Secret {
     kubectl get secret $Name -n $Namespace | Out-Null
 }
 
+function Apply-ManifestPhase {
+    param(
+        [string]$Phase,
+        [string[]]$Files
+    )
+
+    Write-Host "========================================"
+    Write-Host " $Phase"
+    Write-Host "========================================"
+    foreach ($manifest in $Files) {
+        kubectl apply -f $manifest
+    }
+}
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptDir
-$bootstrapDir = Join-Path $repoRoot "k8s\bootstrap"
-$manifests = @(
+
+$infraManifests = @(
     (Join-Path $repoRoot "k8s\00-namespace.yaml"),
+    (Join-Path $repoRoot "k8s\01-postgres-initdb.yaml"),
     (Join-Path $repoRoot "k8s\01-postgres.yaml"),
     (Join-Path $repoRoot "k8s\02-mlflow.yaml"),
     (Join-Path $repoRoot "k8s\03-jellyfin.yaml"),
     (Join-Path $repoRoot "k8s\04-minio.yaml"),
     (Join-Path $repoRoot "k8s\05-minio-init.yaml"),
     (Join-Path $repoRoot "k8s\06-adminer.yaml")
+)
+
+$configManifests = @(
+    (Join-Path $repoRoot "k8s\postgres-initdb.yaml"),
+    (Join-Path $repoRoot "k8s\data-configmap.yaml"),
+    (Join-Path $repoRoot "k8s\online-service-configmap.yaml"),
+    (Join-Path $repoRoot "k8s\simulator-configmap.yaml")
+)
+
+$appManifests = @(
+    (Join-Path $repoRoot "k8s\11-online-service.yaml"),
+    (Join-Path $repoRoot "k8s\12-simulator.yaml"),
+    (Join-Path $repoRoot "k8s\13-data-api.yaml")
 )
 
 Require-Command -Name "kubectl"
@@ -51,6 +80,7 @@ if (-not $SkipSecretSetup) {
     kubectl create namespace $Namespace --dry-run=client -o yaml | kubectl apply -f -
     kubectl create secret generic postgres-secret `
         --namespace $Namespace `
+        --from-literal=POSTGRES_DB=$PostgresDb `
         --from-literal=POSTGRES_USER=$PostgresUser `
         --from-literal=POSTGRES_PASSWORD=$PostgresPassword `
         --dry-run=client -o yaml | kubectl apply -f -
@@ -67,15 +97,8 @@ else {
 }
 
 kubectl delete job minio-init -n $Namespace --ignore-not-found | Out-Null
-kubectl kustomize $bootstrapDir *> $null
-if ($LASTEXITCODE -eq 0) {
-    kubectl apply -k $bootstrapDir
-}
-else {
-    foreach ($manifest in $manifests) {
-        kubectl apply -f $manifest
-    }
-}
+
+Apply-ManifestPhase -Phase "Phase 1: Infrastructure" -Files $infraManifests
 
 kubectl rollout status statefulset/postgres -n $Namespace --timeout=$Timeout
 kubectl rollout status deployment/mlflow -n $Namespace --timeout=$Timeout
@@ -83,6 +106,14 @@ kubectl rollout status deployment/jellyfin -n $Namespace --timeout=$Timeout
 kubectl rollout status deployment/minio -n $Namespace --timeout=$Timeout
 kubectl rollout status deployment/adminer -n $Namespace --timeout=$Timeout
 kubectl wait --for=condition=complete job/minio-init -n $Namespace --timeout=$Timeout
+
+Apply-ManifestPhase -Phase "Phase 2: Config" -Files $configManifests
+Apply-ManifestPhase -Phase "Phase 3: Applications" -Files $appManifests
+
+kubectl rollout status deployment/api -n $Namespace --timeout=$Timeout
+kubectl rollout status deployment/online-service-api -n $Namespace --timeout=$Timeout
+kubectl rollout status deployment/online-service-worker -n $Namespace --timeout=$Timeout
+kubectl rollout status deployment/simulator -n $Namespace --timeout=$Timeout
 
 kubectl get pods -n $Namespace
 kubectl get svc -n $Namespace

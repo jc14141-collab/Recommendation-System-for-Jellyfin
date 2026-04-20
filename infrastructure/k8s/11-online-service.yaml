@@ -1,0 +1,155 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: online-service
+  namespace: mlops
+  labels:
+    app: online-service-api
+spec:
+  selector:
+    app: online-service-api
+  ports:
+    - name: http
+      port: 18080
+      targetPort: 18080
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: online-service-api
+  namespace: mlops
+  labels:
+    app: online-service-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: online-service-api
+  template:
+    metadata:
+      labels:
+        app: online-service-api
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: online-service-api
+          image: songchenxue/online_service:v1.2
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command:
+            - gunicorn
+            - -w
+            - "2"
+            - -b
+            - 0.0.0.0:18080
+            - "scripts.api.candidate_api:create_app()"
+          ports:
+            - containerPort: 18080
+              name: http
+          env:
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: MINIO_ENDPOINT
+              value: http://minio:9000
+            - name: POSTGRES_PORT
+              value: "5432"
+          envFrom:
+            - secretRef:
+                name: data-pipeline-secrets
+            - configMapRef:
+                name: data-pipeline-config
+          volumeMounts:
+            - name: online-service-config
+              mountPath: /app/scripts/config/config.yaml
+              subPath: config.yaml
+              readOnly: true
+            - name: artifacts
+              mountPath: /data/artifacts
+              readOnly: true
+            - name: embedding
+              mountPath: /data/embedding
+      volumes:
+        - name: online-service-config
+          configMap:
+            name: online-service-config
+            items:
+              - key: config.yaml
+                path: config.yaml
+        - name: artifacts
+          hostPath:
+            path: /mnt/block/artifacts
+            type: Directory
+        - name: embedding
+          hostPath:
+            path: /mnt/block/embedding
+            type: Directory
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: online-service-worker
+  namespace: mlops
+  labels:
+    app: online-service-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: online-service-worker
+  template:
+    metadata:
+      labels:
+        app: online-service-worker
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: online-service-worker
+          image: songchenxue/online_service:v1.2
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command:
+            - python
+            - -m
+            - scripts.main
+            - --config
+            - scripts/config/config.yaml
+          env:
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: MINIO_ENDPOINT
+              value: http://minio:9000
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: API_PORT
+              value: "18080"
+          envFrom:
+            - secretRef:
+                name: data-pipeline-secrets
+            - configMapRef:
+                name: data-pipeline-config
+          volumeMounts:
+            - name: online-service-config
+              mountPath: /app/scripts/config/config.yaml
+              subPath: config.yaml
+              readOnly: true
+            - name: artifacts
+              mountPath: /data/artifacts
+              readOnly: true
+            - name: embedding
+              mountPath: /data/embedding
+      volumes:
+        - name: online-service-config
+          configMap:
+            name: online-service-config
+            items:
+              - key: config.yaml
+                path: config.yaml
+        - name: artifacts
+          hostPath:
+            path: /mnt/block/artifacts
+            type: Directory
+        - name: embedding
+          hostPath:
+            path: /mnt/block/embedding
+            type: Directory

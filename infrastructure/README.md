@@ -9,7 +9,7 @@ This repository is focused on:
 - Chameleon infrastructure access and initial cluster bring-up
 - K3s installation and Kubernetes cluster setup
 - Kubernetes namespace and service deployment materials
-- Persistent storage configuration through PVC-backed services
+- Persistent storage configuration for node-local services
 - Deployment manifests for shared platform services and the open-source service used by the project
 
 The repository is intentionally scoped to the initial deployment stage. It is designed to be readable, reproducible, and suitable for packaging as course infrastructure submission material.
@@ -49,14 +49,14 @@ No dedicated Ingress manifest is included in this initial deployment. `NodePort`
 
 ## Persistent Storage
 
-Persistent storage is implemented using the default K3s `local-path` storage class.
+Persistent storage is implemented with a mix of K3s `local-path` PVCs and direct node-local host storage.
 
 - PostgreSQL defines a PVC for database state.
 - MLflow defines a PVC for artifact storage while experiment metadata is stored in PostgreSQL.
 - Jellyfin defines a PVC for configuration retention.
-- MinIO defines a PVC for object storage data.
+- MinIO stores object data under `/mnt/block/minio_data` on the node.
 
-These services rely on persistent volumes so that state and configuration survive pod restart events. In this initial deployment, persistence is scoped to the node-local storage behavior provided by `local-path`.
+These services rely on persistent storage so that state and configuration survive pod restart events. In this initial deployment, persistence remains node-local, using `local-path` PVCs where convenient and direct host mounts where the team wants stable host directories.
 
 ## Repository Structure
 
@@ -74,7 +74,7 @@ The repository supports the following initial deployment workflow:
 1. Provision or access a Chameleon node.
 2. Install K3s on the primary node using `scripts/install-k3s-server.sh`.
 3. If additional nodes are used, join them with `scripts/install-k3s-agent.sh`.
-4. Deploy the base shared services by applying `k8s/bootstrap`, which bundles `00-namespace.yaml` through `06-adminer.yaml`.
+4. Deploy the base shared services by applying `k8s/bootstrap`, which bundles the namespace, PostgreSQL init configmap, infrastructure services, and the role reference ConfigMaps.
 
 The Chameleon instance provisioning and access steps may include manual actions in the Chameleon environment, such as launching the instance, assigning a floating IP, and confirming security group rules. This repository documents and supports the Kubernetes-side deployment after node access is available.
 
@@ -92,13 +92,14 @@ This repository is intended to be packaged and uploaded as infrastructure and de
 
 ## Automated Bootstrap
 
-For day-to-day operations, the recommended path is to deploy the first seven manifests as one unit through the bootstrap kustomization.
+For day-to-day operations, the recommended path is to deploy the bootstrap manifest set as one unit through the bootstrap kustomization.
 
 From a Linux shell with `kubectl` configured for the target cluster:
 
 ```bash
 chmod +x scripts/*.sh
 export POSTGRES_USER="recsys"
+export POSTGRES_DB="recsys"
 export POSTGRES_PASSWORD="replace-with-a-real-password"
 export MINIO_ROOT_USER="minioadmin"
 export MINIO_ROOT_PASSWORD="replace-with-a-real-password"
@@ -108,9 +109,59 @@ export MINIO_ROOT_PASSWORD="replace-with-a-real-password"
 The bootstrap script:
 
 - creates or updates `postgres-secret` and `minio-secret`
-- applies `k8s/bootstrap`, which includes `00-namespace.yaml` through `06-adminer.yaml`
+- applies the infrastructure manifests `00-06`
 - recreates the one-shot `minio-init` job cleanly
 - waits for PostgreSQL, MLflow, Jellyfin, MinIO, and Adminer to become ready
+- applies the config manifests after `16`:
+  - `postgres-initdb.yaml`
+  - `data-configmap.yaml`
+  - `online-service-configmap.yaml`
+  - `simulator-configmap.yaml`
+- applies the application manifests:
+  - `11-online-service.yaml`
+  - `12-simulator.yaml`
+  - `13-data-api.yaml`
+- waits for `api`, `online-service-api`, `online-service-worker`, and `simulator`
+
+## Training Deployment
+
+Training is deployed separately from the infrastructure bootstrap. The current training-layer resources are:
+
+- `14-training-config.yaml`
+- `15-training-manager.yaml`
+- `16-training-retrain-cronjob.yaml`
+
+The training deployment assumes:
+
+- infrastructure bootstrap has already completed
+- `minio-secret` already exists in `mlops`
+- the image `docker.io/library/jellyfin-training:latest` has already been built from `training/Dockerfile` and imported into the node runtime
+
+On the Linux node, prepare the image with:
+
+```bash
+./scripts/import-training-image.sh
+```
+
+From a Linux shell with `kubectl` configured for the target cluster:
+
+```bash
+bash ./scripts/deploy-k8s-training.sh
+```
+
+From Windows PowerShell:
+
+```powershell
+.\scripts\deploy-k8s-training.ps1
+```
+
+The training manager service is exposed on NodePort `30089`, and the scheduled retraining CronJob runs daily at `02:00` UTC.
+
+The end-to-end ops flow is now:
+
+1. Run `bash ./scripts/deploy-k8s-bootstrap.sh`
+2. Run `./scripts/import-training-image.sh`
+3. Run `bash ./scripts/deploy-k8s-training.sh`
 
 If the secrets already exist in the cluster, you can skip secret creation:
 
@@ -123,6 +174,7 @@ From Windows PowerShell:
 ```powershell
 .\scripts\deploy-k8s-bootstrap.ps1 `
   -PostgresUser "recsys" `
+  -PostgresDb "recsys" `
   -PostgresPassword "replace-with-a-real-password" `
   -MinioRootUser "minioadmin" `
   -MinioRootPassword "replace-with-a-real-password"
@@ -136,6 +188,7 @@ After SSH access to a Chameleon node is available:
 chmod +x scripts/*.sh
 sudo ./scripts/install-k3s-server.sh
 export POSTGRES_USER="recsys"
+export POSTGRES_DB="recsys"
 export POSTGRES_PASSWORD="replace-with-a-real-password"
 export MINIO_ROOT_USER="minioadmin"
 export MINIO_ROOT_PASSWORD="replace-with-a-real-password"

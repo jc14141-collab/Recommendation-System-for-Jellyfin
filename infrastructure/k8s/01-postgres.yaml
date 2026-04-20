@@ -1,14 +1,4 @@
-# 01-postgres.yaml: PostgreSQL platform service with init SQL, local host storage, Service, and StatefulSet
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: postgres-initdb
-  namespace: mlops
-data:
-  01-init.sql: |
-    CREATE DATABASE recommender;
-    CREATE DATABASE mlflow;
----
+# 01-postgres.yaml: PostgreSQL platform service with local host storage, Service, and StatefulSet
 apiVersion: v1
 kind: Service
 metadata:
@@ -47,6 +37,11 @@ spec:
             - containerPort: 5432
               name: postgres
           env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_DB
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:

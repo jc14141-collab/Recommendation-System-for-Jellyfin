@@ -1,0 +1,52 @@
+# 16-training-retrain-cronjob.yaml: scheduled retraining for the Jellyfin model
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: retrain-mlp
+  namespace: mlops
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: retrain-mlp
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: retrain
+              image: docker.io/library/jellyfin-training:latest
+              imagePullPolicy: Never
+              workingDir: /app
+              command:
+                - python
+                - -m
+                - scripts.retrain
+                - --config
+                - configs/config.yaml
+              envFrom:
+                - configMapRef:
+                    name: training-config
+              env:
+                - name: S3_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-secret
+                      key: MINIO_ROOT_USER
+                - name: S3_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-secret
+                      key: MINIO_ROOT_PASSWORD
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 1Gi
+                limits:
+                  cpu: "2"
+                  memory: 4Gi

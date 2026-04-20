@@ -9,3 +9,5 @@ pyyaml
 boto3
 fastapi
 uvicorn
+requests
+lightgbm

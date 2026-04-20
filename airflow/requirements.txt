@@ -1,0 +1,2 @@
+apache-airflow-providers-cncf-kubernetes
+psycopg2-binary

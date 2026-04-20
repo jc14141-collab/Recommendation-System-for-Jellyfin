@@ -1,0 +1,78 @@
+executor: LocalExecutor
+
+images:
+  airflow:
+    repository: songchenxue/airflow
+    tag: v1.3
+    pullPolicy: Always
+
+postgresql:
+  enabled: false
+
+data:
+  metadataSecretName: airflow-secrets
+
+fernetKeySecretName: airflow-secrets
+webserverSecretKeySecretName: airflow-secrets
+
+extraEnvFrom: |-
+  - secretRef:
+      name: airflow-secrets
+
+config:
+  core:
+    executor: LocalExecutor
+    load_examples: "False"
+
+migrateDatabaseJob:
+  enabled: true
+
+createUserJob:
+  enabled: true
+  useHelmHooks: true
+  applyCustomEnv: true
+  args:
+    - "bash"
+    - "-c"
+    - |
+      exec airflow users create \
+        --username "$AIRFLOW_ADMIN_USERNAME" \
+        --password "$AIRFLOW_ADMIN_PASSWORD" \
+        --firstname Airflow \
+        --lastname Admin \
+        --role Admin \
+        --email "$AIRFLOW_ADMIN_EMAIL" || true
+
+serviceAccount:
+  create: false
+  name: airflow-job-trigger
+
+scheduler:
+  serviceAccount:
+    create: false
+    name: airflow-job-trigger
+
+webserver:
+  serviceAccount:
+    create: false
+    name: airflow-job-trigger
+  service:
+    type: NodePort
+
+triggerer:
+  serviceAccount:
+    create: false
+    name: airflow-job-trigger
+
+dagProcessor:
+  serviceAccount:
+    create: false
+    name: airflow-job-trigger
+
+dags:
+  persistence:
+    enabled: false
+
+logs:
+  persistence:
+    enabled: false

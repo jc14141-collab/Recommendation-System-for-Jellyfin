@@ -8,13 +8,26 @@ data:
   services: |
     trainer:
       docker_source:
-        - ../../docker-training
-        - ../../train.py
-        - ../../config.yaml
+        - ../../training/Dockerfile
+        - ../../training/scripts/retrain.py
+        - ../../training/configs/config.yaml
       kubernetes_equivalent:
-        - Job
         - CronJob
+      implemented_in_repo: k8s/16-training-retrain-cronjob.yaml
       integration_targets:
         - mlflow
         - minio
-      status: planned
+      status: implemented
+    training_manager:
+      docker_source:
+        - ../../training/api/server.py
+        - ../../training/frontend/index.html
+      kubernetes_equivalent:
+        - Deployment
+        - Service
+      implemented_in_repo: k8s/15-training-manager.yaml
+      integration_targets:
+        - mlflow
+        - minio
+        - recommender-serving
+      status: implemented

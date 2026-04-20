@@ -1,0 +1,11 @@
+*.parquet
+*.npy
+*.pt
+*.ckpt
+data/
+artifacts/
+logs/
+__pycache__/
+*.pyc
+.git
+*.md
