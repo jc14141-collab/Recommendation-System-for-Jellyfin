@@ -628,7 +628,7 @@ function sendFeedback(movieId, rank, btn) {
     return;
   }
 
-  var SERVING = 'http://129.114.25.107:8002';
+  var SERVING = window.location.protocol + '//' + window.location.hostname + ':30082';
   fetch(SERVING + '/feedback', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
