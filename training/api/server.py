@@ -118,7 +118,7 @@ def run_retrain(version=None, base_model="mlp"):
     training_state["finished_at"] = None
 
     try:
-        cmd = ["python", "-m", "scripts.retrain", "--config", CONFIG_PATH]
+        cmd = ["python", "-u", "-m", "scripts.retrain", "--config", CONFIG_PATH]
         if version:
             cmd += ["--version", version]
 
