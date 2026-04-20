@@ -127,6 +127,12 @@ The training deployment assumes:
 - `minio-secret` already exists in `mlops`
 - the image `docker.io/library/jellyfin-training:latest` has already been built from `training/Dockerfile` and imported into the node runtime
 
+On the Linux node, prepare the image with:
+
+```bash
+./scripts/import-training-image.sh
+```
+
 From a Linux shell with `kubectl` configured for the target cluster:
 
 ```bash
@@ -140,6 +146,12 @@ From Windows PowerShell:
 ```
 
 The training manager service is exposed on NodePort `30089`, and the scheduled retraining CronJob runs daily at `02:00` UTC.
+
+The end-to-end ops flow is now:
+
+1. Run `bash ./scripts/deploy-k8s-bootstrap.sh`
+2. Run `./scripts/import-training-image.sh`
+3. Run `bash ./scripts/deploy-k8s-training.sh`
 
 If the secrets already exist in the cluster, you can skip secret creation:
 
