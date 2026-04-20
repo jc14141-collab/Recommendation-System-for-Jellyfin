@@ -24,6 +24,13 @@ $manifests = @(
 
 Require-Command -Name "kubectl"
 
+if ((Get-Command sudo -ErrorAction SilentlyContinue) -and (Get-Command crictl -ErrorAction SilentlyContinue)) {
+    $runtimeImages = sudo crictl images | Out-String
+    if ($runtimeImages -notmatch "jellyfin-training") {
+        throw "Training image docker.io/library/jellyfin-training:latest was not found in the node runtime. Run ./scripts/import-training-image.sh on the node first."
+    }
+}
+
 kubectl get namespace $Namespace | Out-Null
 kubectl get secret minio-secret -n $Namespace | Out-Null
 

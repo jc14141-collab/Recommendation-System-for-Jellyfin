@@ -6,6 +6,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TRAINING_DIR="${REPO_ROOT}/k8s/training"
 NAMESPACE="${NAMESPACE:-mlops}"
 WAIT_TIMEOUT="${WAIT_TIMEOUT:-300s}"
+IMAGE_REF="${IMAGE_REF:-docker.io/library/jellyfin-training:latest}"
 
 usage() {
   cat <<'EOF'
@@ -20,6 +21,10 @@ Assumptions:
   - namespace mlops already exists
   - minio-secret already exists
   - the image docker.io/library/jellyfin-training:latest is already imported into the node runtime
+
+Recommended flow:
+  1. ./scripts/import-training-image.sh
+  2. ./scripts/deploy-k8s-training.sh
 EOF
 }
 
@@ -49,6 +54,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 require_command kubectl
+
+if command -v sudo >/dev/null 2>&1 && command -v crictl >/dev/null 2>&1; then
+  if ! sudo crictl images | grep -q "jellyfin-training"; then
+    echo "Training image '$IMAGE_REF' was not found in the node runtime." >&2
+    echo "Run ./scripts/import-training-image.sh first, then retry deployment." >&2
+    exit 1
+  fi
+fi
 
 kubectl get namespace "$NAMESPACE" >/dev/null
 kubectl get secret minio-secret -n "$NAMESPACE" >/dev/null
