@@ -212,7 +212,7 @@ The serving endpoints are:
 
 The external NodePorts are:
 
-- prod alias: `http://<node-ip>:30080`
+- prod alias: `http://<node-ip>:31080`
 - prod direct: `http://<node-ip>:30082`
 - staging: `http://<node-ip>:30083`
 - canary: `http://<node-ip>:30084`
