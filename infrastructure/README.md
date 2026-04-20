@@ -74,7 +74,7 @@ The repository supports the following initial deployment workflow:
 1. Provision or access a Chameleon node.
 2. Install K3s on the primary node using `scripts/install-k3s-server.sh`.
 3. If additional nodes are used, join them with `scripts/install-k3s-agent.sh`.
-4. Deploy the base shared services by applying `k8s/bootstrap`, which bundles `00-namespace.yaml` through `06-adminer.yaml`.
+4. Deploy the base shared services by applying `k8s/bootstrap`, which bundles the namespace, PostgreSQL init configmap, infrastructure services, and the role reference ConfigMaps.
 
 The Chameleon instance provisioning and access steps may include manual actions in the Chameleon environment, such as launching the instance, assigning a floating IP, and confirming security group rules. This repository documents and supports the Kubernetes-side deployment after node access is available.
 
@@ -92,7 +92,7 @@ This repository is intended to be packaged and uploaded as infrastructure and de
 
 ## Automated Bootstrap
 
-For day-to-day operations, the recommended path is to deploy the first seven manifests as one unit through the bootstrap kustomization.
+For day-to-day operations, the recommended path is to deploy the bootstrap manifest set as one unit through the bootstrap kustomization.
 
 From a Linux shell with `kubectl` configured for the target cluster:
 
@@ -108,7 +108,7 @@ export MINIO_ROOT_PASSWORD="replace-with-a-real-password"
 The bootstrap script:
 
 - creates or updates `postgres-secret` and `minio-secret`
-- applies `k8s/bootstrap`, which includes `00-namespace.yaml` through `06-adminer.yaml`
+- applies `k8s/bootstrap`, which includes the namespace, `postgres-initdb`, the infrastructure services, and the role reference ConfigMaps
 - recreates the one-shot `minio-init` job cleanly
 - waits for PostgreSQL, MLflow, Jellyfin, MinIO, and Adminer to become ready
 

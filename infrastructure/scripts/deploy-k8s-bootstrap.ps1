@@ -30,12 +30,18 @@ $repoRoot = Split-Path -Parent $scriptDir
 $bootstrapDir = Join-Path $repoRoot "k8s\bootstrap"
 $manifests = @(
     (Join-Path $repoRoot "k8s\00-namespace.yaml"),
+    (Join-Path $repoRoot "k8s\01-postgres-initdb.yaml"),
     (Join-Path $repoRoot "k8s\01-postgres.yaml"),
     (Join-Path $repoRoot "k8s\02-mlflow.yaml"),
     (Join-Path $repoRoot "k8s\03-jellyfin.yaml"),
     (Join-Path $repoRoot "k8s\04-minio.yaml"),
     (Join-Path $repoRoot "k8s\05-minio-init.yaml"),
-    (Join-Path $repoRoot "k8s\06-adminer.yaml")
+    (Join-Path $repoRoot "k8s\06-adminer.yaml"),
+    (Join-Path $repoRoot "k8s\07-compose-apps-template.yaml"),
+    (Join-Path $repoRoot "k8s\07-data-role-components.yaml"),
+    (Join-Path $repoRoot "k8s\08-training-role-components.yaml"),
+    (Join-Path $repoRoot "k8s\09-serving-role-components.yaml"),
+    (Join-Path $repoRoot "k8s\10-devops-platform-components.yaml")
 )
 
 Require-Command -Name "kubectl"

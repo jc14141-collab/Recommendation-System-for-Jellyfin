@@ -1,0 +1,10 @@
+# 01-postgres-initdb.yaml: PostgreSQL init SQL configmap applied before the database statefulset
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-initdb
+  namespace: mlops
+data:
+  01-init.sql: |
+    CREATE DATABASE recommender;
+    CREATE DATABASE mlflow;

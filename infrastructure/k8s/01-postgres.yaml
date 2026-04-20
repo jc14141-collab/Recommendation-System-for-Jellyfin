@@ -1,4 +1,4 @@
-# 01-postgres.yaml: PostgreSQL platform service with init SQL, local host storage, Service, and StatefulSet
+# 01-postgres.yaml: PostgreSQL platform service with local host storage, Service, and StatefulSet
 apiVersion: v1
 kind: Service
 metadata:

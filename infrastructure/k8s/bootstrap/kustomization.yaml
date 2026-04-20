@@ -3,9 +3,15 @@ kind: Kustomization
 
 resources:
   - ../00-namespace.yaml
+  - ../01-postgres-initdb.yaml
   - ../01-postgres.yaml
   - ../02-mlflow.yaml
   - ../03-jellyfin.yaml
   - ../04-minio.yaml
   - ../05-minio-init.yaml
   - ../06-adminer.yaml
+  - ../07-compose-apps-template.yaml
+  - ../07-data-role-components.yaml
+  - ../08-training-role-components.yaml
+  - ../09-serving-role-components.yaml
+  - ../10-devops-platform-components.yaml

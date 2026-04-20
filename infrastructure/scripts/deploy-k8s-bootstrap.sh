@@ -12,14 +12,20 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/deploy-k8s-bootstrap.sh [--skip-secret-setup] [--timeout 300s]
 
-Deploy the first seven Kubernetes manifests in one pass:
+Deploy the infrastructure bootstrap manifests in one pass:
   00-namespace.yaml
+  01-postgres-initdb.yaml
   01-postgres.yaml
   02-mlflow.yaml
   03-jellyfin.yaml
   04-minio.yaml
   05-minio-init.yaml
   06-adminer.yaml
+  07-compose-apps-template.yaml
+  07-data-role-components.yaml
+  08-training-role-components.yaml
+  09-serving-role-components.yaml
+  10-devops-platform-components.yaml
 
 Environment variables:
   NAMESPACE            Target namespace. Default: mlops
@@ -74,12 +80,18 @@ require_command kubectl
 
 MANIFESTS=(
   "$REPO_ROOT/k8s/00-namespace.yaml"
+  "$REPO_ROOT/k8s/01-postgres-initdb.yaml"
   "$REPO_ROOT/k8s/01-postgres.yaml"
   "$REPO_ROOT/k8s/02-mlflow.yaml"
   "$REPO_ROOT/k8s/03-jellyfin.yaml"
   "$REPO_ROOT/k8s/04-minio.yaml"
   "$REPO_ROOT/k8s/05-minio-init.yaml"
   "$REPO_ROOT/k8s/06-adminer.yaml"
+  "$REPO_ROOT/k8s/07-compose-apps-template.yaml"
+  "$REPO_ROOT/k8s/07-data-role-components.yaml"
+  "$REPO_ROOT/k8s/08-training-role-components.yaml"
+  "$REPO_ROOT/k8s/09-serving-role-components.yaml"
+  "$REPO_ROOT/k8s/10-devops-platform-components.yaml"
 )
 
 if kubectl kustomize "$BOOTSTRAP_DIR" >/dev/null 2>&1; then
