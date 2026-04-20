@@ -101,7 +101,7 @@ echo ""
 echo "========================================"
 echo " Step 6: Prometheus targets"
 echo "========================================"
-sleep 5
+sleep 15
 curl -s http://localhost:9090/api/v1/targets 2>/dev/null | python3 - << 'PYEOF'
 import sys, json
 try:
@@ -128,3 +128,34 @@ else
     echo "[warn] Some instances failed. Check logs:"
     echo "  docker compose -f $COMPOSE_FILE logs"
 fi
+
+echo ""
+echo "========================================"
+echo " Step 7: install requirements"
+echo "========================================"
+pip3 install -r "$PROJECT_ROOT/serving/requirements-host.txt" --quiet
+echo "Dependencies installed."
+
+echo ""
+echo "========================================"
+echo " Step 8: start monitor.py"
+echo "========================================"
+pkill -f "monitor.py" 2>/dev/null || true
+
+nohup python3 "$PROJECT_ROOT/scripts/monitor.py" > /tmp/monitor.log 2>&1 &
+MONITOR_PID=$!
+echo "Monitor started with PID: $MONITOR_PID"
+
+sleep 3
+if kill -0 $MONITOR_PID 2>/dev/null; then
+    echo "[ok]  monitor.py is running"
+    tail -5 /tmp/monitor.log
+else
+    echo "[warn] monitor.py failed to start, check /tmp/monitor.log"
+fi
+
+echo ""
+echo "========================================"
+echo " All done! System is fully operational."
+echo " Monitor log: tail -f /tmp/monitor.log"
+echo "========================================"

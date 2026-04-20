@@ -4,7 +4,7 @@ set -euo pipefail
 CONFIG="${1:-config/config.yaml}"
 PT_PATH="/tmp/model_mlp_best.pt"
 ONNX_PATH="/tmp/model_mlp_best.onnx"
-STAGING_URL="http://localhost:8003"
+STAGING_URL="http://172.17.0.1:8003"
 
 echo "========================================"
 echo " Export .pt -> .onnx & upload to MinIO"
