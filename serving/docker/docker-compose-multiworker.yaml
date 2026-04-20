@@ -1,0 +1,90 @@
+services:
+  serving-staging:
+    build:
+      context: ../serving/multiworker
+      dockerfile: Dockerfile
+    container_name: jellyfin_serving_staging
+    ports:
+      - "8003:8000"
+    environment:
+      SERVING_MODE: model
+      FALLBACK_POOL_SIZE: 100
+      FALLBACK_IDS_FILE: /app/app/fallback_popular_movies.json
+      MINIO_ENDPOINT:   ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET:     ${MINIO_BUCKET:-warehouse}
+      ONNX_OBJECT:      models/mlp/staging/model_mlp_best.onnx
+    restart: unless-stopped
+
+  serving-canary:
+    build:
+      context: ../serving/multiworker
+      dockerfile: Dockerfile
+    container_name: jellyfin_serving_canary
+    ports:
+      - "8004:8000"
+    environment:
+      SERVING_MODE: model
+      FALLBACK_POOL_SIZE: 100
+      FALLBACK_IDS_FILE: /app/app/fallback_popular_movies.json
+      MINIO_ENDPOINT:   ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET:     ${MINIO_BUCKET:-warehouse}
+      ONNX_OBJECT:      models/mlp/canary/model_mlp_best.onnx
+    restart: unless-stopped
+
+  serving-prod:
+    build:
+      context: ../serving/multiworker
+      dockerfile: Dockerfile
+    container_name: jellyfin_serving_prod
+    ports:
+      - "8002:8000"
+    environment:
+      SERVING_MODE: model
+      FALLBACK_POOL_SIZE: 100
+      FALLBACK_IDS_FILE: /app/app/fallback_popular_movies.json
+      MINIO_ENDPOINT:   ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET:     ${MINIO_BUCKET:-warehouse}
+      ONNX_OBJECT:      models/mlp/prod/model_mlp_best.onnx
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.0
+    container_name: jellyfin_node_exporter
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: jellyfin_multiworker_prometheus
+    command:
+      - "--config.file=/etc/prometheus/multiworker_prometheus.yml"
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - serving-prod
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: jellyfin_multiworker_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/multiworker-overview.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
