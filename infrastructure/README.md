@@ -99,6 +99,7 @@ From a Linux shell with `kubectl` configured for the target cluster:
 ```bash
 chmod +x scripts/*.sh
 export POSTGRES_USER="recsys"
+export POSTGRES_DB="recsys"
 export POSTGRES_PASSWORD="replace-with-a-real-password"
 export MINIO_ROOT_USER="minioadmin"
 export MINIO_ROOT_PASSWORD="replace-with-a-real-password"
@@ -123,6 +124,7 @@ From Windows PowerShell:
 ```powershell
 .\scripts\deploy-k8s-bootstrap.ps1 `
   -PostgresUser "recsys" `
+  -PostgresDb "recsys" `
   -PostgresPassword "replace-with-a-real-password" `
   -MinioRootUser "minioadmin" `
   -MinioRootPassword "replace-with-a-real-password"
@@ -136,6 +138,7 @@ After SSH access to a Chameleon node is available:
 chmod +x scripts/*.sh
 sudo ./scripts/install-k3s-server.sh
 export POSTGRES_USER="recsys"
+export POSTGRES_DB="recsys"
 export POSTGRES_PASSWORD="replace-with-a-real-password"
 export MINIO_ROOT_USER="minioadmin"
 export MINIO_ROOT_PASSWORD="replace-with-a-real-password"

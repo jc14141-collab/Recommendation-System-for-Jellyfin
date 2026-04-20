@@ -2,6 +2,7 @@
 set -euo pipefail
 
 NAMESPACE="${NAMESPACE:-mlops}"
+POSTGRES_DB="${POSTGRES_DB:-recsys}"
 POSTGRES_USER="${POSTGRES_USER:-recsys}"
 
 if [[ -z "${POSTGRES_PASSWORD:-}" ]]; then
@@ -16,6 +17,7 @@ kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply
 
 kubectl create secret generic postgres-secret \
   --namespace "${NAMESPACE}" \
+  --from-literal=POSTGRES_DB="${POSTGRES_DB}" \
   --from-literal=POSTGRES_USER="${POSTGRES_USER}" \
   --from-literal=POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
   --dry-run=client -o yaml | kubectl apply -f -

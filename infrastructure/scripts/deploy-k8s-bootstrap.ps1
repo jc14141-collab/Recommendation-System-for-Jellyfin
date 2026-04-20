@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Namespace = "mlops",
+    [string]$PostgresDb = "recsys",
     [string]$PostgresUser = "recsys",
     [string]$PostgresPassword = "",
     [string]$MinioRootUser = "",
@@ -57,6 +58,7 @@ if (-not $SkipSecretSetup) {
     kubectl create namespace $Namespace --dry-run=client -o yaml | kubectl apply -f -
     kubectl create secret generic postgres-secret `
         --namespace $Namespace `
+        --from-literal=POSTGRES_DB=$PostgresDb `
         --from-literal=POSTGRES_USER=$PostgresUser `
         --from-literal=POSTGRES_PASSWORD=$PostgresPassword `
         --dry-run=client -o yaml | kubectl apply -f -
