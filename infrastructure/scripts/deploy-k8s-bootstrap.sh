@@ -3,7 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-BOOTSTRAP_DIR="${REPO_ROOT}/k8s/bootstrap"
 NAMESPACE="${NAMESPACE:-mlops}"
 WAIT_TIMEOUT="${WAIT_TIMEOUT:-300s}"
 SKIP_SECRET_SETUP="${SKIP_SECRET_SETUP:-false}"
@@ -12,7 +11,9 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/deploy-k8s-bootstrap.sh [--skip-secret-setup] [--timeout 300s]
 
-Deploy the infrastructure bootstrap manifests in one pass:
+Apply the Kubernetes manifests in three phases:
+
+Phase 1: Infrastructure (00-06)
   00-namespace.yaml
   01-postgres-initdb.yaml
   01-postgres.yaml
@@ -21,11 +22,17 @@ Deploy the infrastructure bootstrap manifests in one pass:
   04-minio.yaml
   05-minio-init.yaml
   06-adminer.yaml
-  07-compose-apps-template.yaml
-  07-data-role-components.yaml
-  08-training-role-components.yaml
-  09-serving-role-components.yaml
-  10-devops-platform-components.yaml
+
+Phase 2: Config
+  postgres-initdb.yaml
+  data-configmap.yaml
+  online-service-configmap.yaml
+  simulator-configmap.yaml
+
+Phase 3: Applications
+  11-online-service.yaml
+  12-simulator.yaml
+  13-data-api.yaml
 
 Environment variables:
   NAMESPACE            Target namespace. Default: mlops
@@ -55,6 +62,18 @@ ensure_secret() {
   fi
 }
 
+apply_manifest_phase() {
+  local phase="$1"
+  shift
+
+  echo "========================================"
+  echo " ${phase}"
+  echo "========================================"
+  for manifest in "$@"; do
+    kubectl apply -f "$manifest"
+  done
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-secret-setup)
@@ -79,7 +98,7 @@ done
 
 require_command kubectl
 
-MANIFESTS=(
+INFRA_MANIFESTS=(
   "$REPO_ROOT/k8s/00-namespace.yaml"
   "$REPO_ROOT/k8s/01-postgres-initdb.yaml"
   "$REPO_ROOT/k8s/01-postgres.yaml"
@@ -88,21 +107,20 @@ MANIFESTS=(
   "$REPO_ROOT/k8s/04-minio.yaml"
   "$REPO_ROOT/k8s/05-minio-init.yaml"
   "$REPO_ROOT/k8s/06-adminer.yaml"
-  "$REPO_ROOT/k8s/07-compose-apps-template.yaml"
-  "$REPO_ROOT/k8s/07-data-role-components.yaml"
-  "$REPO_ROOT/k8s/08-training-role-components.yaml"
-  "$REPO_ROOT/k8s/09-serving-role-components.yaml"
-  "$REPO_ROOT/k8s/10-devops-platform-components.yaml"
 )
 
-if kubectl kustomize "$BOOTSTRAP_DIR" >/dev/null 2>&1; then
-  APPLY_COMMAND=(kubectl apply -k "$BOOTSTRAP_DIR")
-else
-  APPLY_COMMAND=(kubectl apply)
-  for manifest in "${MANIFESTS[@]}"; do
-    APPLY_COMMAND+=(-f "$manifest")
-  done
-fi
+CONFIG_MANIFESTS=(
+  "$REPO_ROOT/k8s/postgres-initdb.yaml"
+  "$REPO_ROOT/k8s/data-configmap.yaml"
+  "$REPO_ROOT/k8s/online-service-configmap.yaml"
+  "$REPO_ROOT/k8s/simulator-configmap.yaml"
+)
+
+APP_MANIFESTS=(
+  "$REPO_ROOT/k8s/11-online-service.yaml"
+  "$REPO_ROOT/k8s/12-simulator.yaml"
+  "$REPO_ROOT/k8s/13-data-api.yaml"
+)
 
 if [[ "$SKIP_SECRET_SETUP" != "true" ]]; then
   if [[ -z "${POSTGRES_PASSWORD:-}" ]]; then
@@ -125,7 +143,8 @@ else
 fi
 
 kubectl delete job minio-init -n "$NAMESPACE" --ignore-not-found >/dev/null
-"${APPLY_COMMAND[@]}"
+
+apply_manifest_phase "Phase 1: Infrastructure" "${INFRA_MANIFESTS[@]}"
 
 kubectl rollout status statefulset/postgres -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 kubectl rollout status deployment/mlflow -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
@@ -133,6 +152,14 @@ kubectl rollout status deployment/jellyfin -n "$NAMESPACE" --timeout="$WAIT_TIME
 kubectl rollout status deployment/minio -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 kubectl rollout status deployment/adminer -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 kubectl wait --for=condition=complete job/minio-init -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
+
+apply_manifest_phase "Phase 2: Config" "${CONFIG_MANIFESTS[@]}"
+apply_manifest_phase "Phase 3: Applications" "${APP_MANIFESTS[@]}"
+
+kubectl rollout status deployment/api -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
+kubectl rollout status deployment/online-service-api -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
+kubectl rollout status deployment/online-service-worker -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
+kubectl rollout status deployment/simulator -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 
 kubectl get pods -n "$NAMESPACE"
 kubectl get svc -n "$NAMESPACE"

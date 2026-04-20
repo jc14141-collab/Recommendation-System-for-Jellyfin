@@ -109,9 +109,19 @@ export MINIO_ROOT_PASSWORD="replace-with-a-real-password"
 The bootstrap script:
 
 - creates or updates `postgres-secret` and `minio-secret`
-- applies `k8s/bootstrap`, which includes the namespace, `postgres-initdb`, the infrastructure services, and the role reference ConfigMaps
+- applies the infrastructure manifests `00-06`
 - recreates the one-shot `minio-init` job cleanly
 - waits for PostgreSQL, MLflow, Jellyfin, MinIO, and Adminer to become ready
+- applies the config manifests after `16`:
+  - `postgres-initdb.yaml`
+  - `data-configmap.yaml`
+  - `online-service-configmap.yaml`
+  - `simulator-configmap.yaml`
+- applies the application manifests:
+  - `11-online-service.yaml`
+  - `12-simulator.yaml`
+  - `13-data-api.yaml`
+- waits for `api`, `online-service-api`, `online-service-worker`, and `simulator`
 
 ## Training Deployment
 
