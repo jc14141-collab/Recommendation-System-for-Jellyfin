@@ -112,46 +112,6 @@ The bootstrap script:
 - recreates the one-shot `minio-init` job cleanly
 - waits for PostgreSQL, MLflow, Jellyfin, MinIO, and Adminer to become ready
 
-## App Deployment
-
-Application services are managed separately from the infrastructure bootstrap so that redeploying API or training UI containers does not force a database or object-store restart.
-
-The app-layer manifests currently included in this repository are:
-
-- `11-data-pipeline-config.yaml`
-- `12-online-service-config.yaml`
-- `13-api.yaml`
-- `14-online-service-api.yaml`
-- `15-training-manager.yaml`
-- `16-retrain-job.yaml` as a manual job template for one-off retraining
-
-From a Linux shell with `kubectl` configured for the target cluster:
-
-```bash
-export POSTGRES_USER="recsys"
-export POSTGRES_PASSWORD="replace-with-a-real-password"
-export S3_ACCESS_KEY="minioadmin"
-export S3_SECRET_KEY="replace-with-a-real-password"
-export ADMIN_PASSWORD="replace-with-a-real-password"
-bash ./scripts/deploy-k8s-apps.sh
-```
-
-From Windows PowerShell:
-
-```powershell
-.\scripts\deploy-k8s-apps.ps1 `
-  -PostgresUser "recsys" `
-  -PostgresPassword "replace-with-a-real-password" `
-  -S3AccessKey "minioadmin" `
-  -S3SecretKey "replace-with-a-real-password" `
-  -AdminPassword "replace-with-a-real-password"
-```
-
-Notes:
-
-- `training-manager` uses the image `project25-training-manager:latest`, which should be built from `training/Dockerfile` and loaded onto the node or published to a registry before deployment.
-- `retrain-mlp` is intentionally not included in the app-layer kustomization because retraining should be triggered manually. Apply `k8s/16-retrain-job.yaml` only when you want a new model run.
-
 If the secrets already exist in the cluster, you can skip secret creation:
 
 ```bash

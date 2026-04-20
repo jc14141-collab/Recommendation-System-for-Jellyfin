@@ -6,7 +6,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV GIT_PYTHON_REFRESH=quiet
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY api/ api/
-COPY frontend/ frontend/
 COPY scripts/ scripts/
 COPY configs/ configs/
