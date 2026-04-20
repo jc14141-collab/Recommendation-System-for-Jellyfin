@@ -8,4 +8,5 @@ data:
   MLFLOW_TRACKING_URI: http://mlflow.mlops.svc.cluster.local:5000
   S3_ENDPOINT: http://minio.mlops.svc.cluster.local:9000
   GIT_PYTHON_REFRESH: quiet
+  CANDIDATE_API: http://online-service.mlops.svc.cluster.local:18080/candidates
   SERVING_URL: http://recommender-serving:8000
