@@ -1,0 +1,15 @@
+# 11-data-pipeline-config.yaml: shared non-secret configuration for app-layer services
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-pipeline-config
+  namespace: mlops
+data:
+  POSTGRES_DB: recsys
+  MLFLOW_TRACKING_URI: http://mlflow:5000
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: eu-central-1
+  S3_USE_SSL: "false"
+  WAREHOUSE_BUCKET: warehouse
+  RAW_BUCKET: raw
+  EMBEDDING_BUCKET: embedding

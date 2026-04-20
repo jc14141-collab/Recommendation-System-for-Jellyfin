@@ -1,0 +1,96 @@
+# 15-training-manager.yaml: UI and API for manual retraining, model history, and recommendation preview
+apiVersion: v1
+kind: Service
+metadata:
+  name: training-manager
+  namespace: mlops
+spec:
+  selector:
+    app: training-manager
+  ports:
+    - name: http
+      port: 8096
+      targetPort: 8096
+      nodePort: 30089
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: training-manager
+  namespace: mlops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: training-manager
+  template:
+    metadata:
+      labels:
+        app: training-manager
+    spec:
+      containers:
+        - name: training-manager
+          image: project25-training-manager:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - uvicorn
+            - api.server:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8096"
+          envFrom:
+            - secretRef:
+                name: data-pipeline-secrets
+            - configMapRef:
+                name: data-pipeline-config
+          env:
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: MLFLOW_TRACKING_URI
+              value: http://mlflow:5000
+            - name: S3_ENDPOINT
+              value: http://minio:9000
+          ports:
+            - containerPort: 8096
+              name: http
+          volumeMounts:
+            - name: online-service-config
+              mountPath: /app/configs/config.yaml
+              subPath: config.yaml
+            - name: artifacts
+              mountPath: /mnt/block/artifacts
+            - name: embedding
+              mountPath: /mnt/block/embedding
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            tcpSocket:
+              port: 8096
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8096
+            initialDelaySeconds: 30
+            periodSeconds: 15
+      volumes:
+        - name: online-service-config
+          configMap:
+            name: online-service-config
+        - name: artifacts
+          hostPath:
+            path: /mnt/block/artifacts
+            type: DirectoryOrCreate
+        - name: embedding
+          hostPath:
+            path: /mnt/block/embedding
+            type: DirectoryOrCreate

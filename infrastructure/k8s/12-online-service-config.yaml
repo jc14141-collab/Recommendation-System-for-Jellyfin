@@ -1,0 +1,45 @@
+# 12-online-service-config.yaml: mounted application config for online-service-api and training manager
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: online-service-config
+  namespace: mlops
+data:
+  config.yaml: |
+    s3:
+      endpoint: "http://minio:9000"
+      access_key_id: "CHANGE_ME"
+      secret_access_key: "CHANGE_ME"
+      region: "eu-central-1"
+      use_ssl: false
+    data:
+      root_dir: "s3://warehouse/dataset/versioned_dataset"
+      version: "v0002"
+      embedding_dim: 384
+      parquet_batch_size_rows: 4096
+      loader_batch_size: 256
+      num_workers: 0
+    mlflow:
+      tracking_uri: "http://mlflow:5000"
+      experiment_name: "indieflicks-recommender"
+    pretrained:
+      enabled: true
+      source: "s3"
+      s3_bucket: "warehouse"
+      s3_key: "models/mlp/latest/model_mlp_best.pt"
+    training:
+      max_train_batches: null
+      max_val_batches: null
+    model_output:
+      s3_bucket: "warehouse"
+      version_key: "models/mlp/v0002/model_mlp_best.pt"
+      latest_key: "models/mlp/latest/model_mlp_best.pt"
+    models:
+      mlp:
+        description: "MLP retrained on v0002 new user data"
+        params:
+          hidden_dims: [512, 256, 128]
+          dropout: 0.3
+          learning_rate: 0.0005
+          weight_decay: 0.0001
+          epochs: 15
