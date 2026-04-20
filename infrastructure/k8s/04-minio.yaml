@@ -1,16 +1,4 @@
-# 04-minio.yaml: MinIO object storage service with PVC-backed state and NodePort exposure
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: minio-data
-  namespace: mlops
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 30Gi
----
+# 04-minio.yaml: MinIO object storage service with local host storage and NodePort exposure
 apiVersion: v1
 kind: Service
 metadata:
@@ -100,5 +88,6 @@ spec:
             periodSeconds: 15
       volumes:
         - name: minio-data
-          persistentVolumeClaim:
-            claimName: minio-data
+          hostPath:
+            path: /mnt/block/minio_data
+            type: DirectoryOrCreate

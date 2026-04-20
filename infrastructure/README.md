@@ -9,7 +9,7 @@ This repository is focused on:
 - Chameleon infrastructure access and initial cluster bring-up
 - K3s installation and Kubernetes cluster setup
 - Kubernetes namespace and service deployment materials
-- Persistent storage configuration through PVC-backed services
+- Persistent storage configuration for node-local services
 - Deployment manifests for shared platform services and the open-source service used by the project
 
 The repository is intentionally scoped to the initial deployment stage. It is designed to be readable, reproducible, and suitable for packaging as course infrastructure submission material.
@@ -49,14 +49,14 @@ No dedicated Ingress manifest is included in this initial deployment. `NodePort`
 
 ## Persistent Storage
 
-Persistent storage is implemented using the default K3s `local-path` storage class.
+Persistent storage is implemented with a mix of K3s `local-path` PVCs and direct node-local host storage.
 
 - PostgreSQL defines a PVC for database state.
 - MLflow defines a PVC for artifact storage while experiment metadata is stored in PostgreSQL.
 - Jellyfin defines a PVC for configuration retention.
-- MinIO defines a PVC for object storage data.
+- MinIO stores object data under `/mnt/block/minio_data` on the node.
 
-These services rely on persistent volumes so that state and configuration survive pod restart events. In this initial deployment, persistence is scoped to the node-local storage behavior provided by `local-path`.
+These services rely on persistent storage so that state and configuration survive pod restart events. In this initial deployment, persistence remains node-local, using `local-path` PVCs where convenient and direct host mounts where the team wants stable host directories.
 
 ## Repository Structure
 
