@@ -1,10 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONFIG_ENV="$PROJECT_ROOT/serving/config.env"
+
 CONFIG="${1:-config/config.yaml}"
 PT_PATH="/tmp/model_mlp_best.pt"
 ONNX_PATH="/tmp/model_mlp_best.onnx"
-STAGING_URL="http://172.17.0.1:8003"
+
+# config.env  STAGING_URL_INTERNAL
+if [ -f "$CONFIG_ENV" ]; then
+    set -a
+    source "$CONFIG_ENV"
+    set +a
+fi
+
+STAGING_URL="${STAGING_URL_INTERNAL:-http://172.17.0.1:8003}"
 
 echo "========================================"
 echo " Export .pt -> .onnx & upload to MinIO"
@@ -16,9 +28,8 @@ python3 scripts/export_to_onnx.py \
 
 echo ""
 echo "========================================"
-echo " Deploy to staging"
+echo " Deploy to staging: $STAGING_URL"
 echo "========================================"
-
 VERSION=$(python3 -c "
 import yaml, re
 cfg = yaml.safe_load(open('$CONFIG'))

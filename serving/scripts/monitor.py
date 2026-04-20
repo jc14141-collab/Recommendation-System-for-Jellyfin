@@ -4,23 +4,23 @@ Auto monitor: staging -> canary -> prod promote pipeline
 Usage: python3 scripts/monitor.py
 """
 
+import os
 import time
-import re
 import boto3
 import requests
 from botocore.client import Config
 from pathlib import Path
 
-# ── Configuration ──
-STAGING_URL    = "http://localhost:8003"
-CANARY_URL     = "http://localhost:8004"
-PROD_URL       = "http://localhost:8002"
-PROMETHEUS_URL = "http://localhost:9090"
 
-MINIO_ENDPOINT   = "http://10.56.2.170:30900"
-MINIO_ACCESS_KEY = "minioadmin"
-MINIO_SECRET_KEY = "minioadmin123"
-BUCKET           = "warehouse"
+STAGING_URL    = os.getenv("STAGING_URL",    "http://localhost:8003")
+CANARY_URL     = os.getenv("CANARY_URL",     "http://localhost:8004")
+PROD_URL       = os.getenv("PROD_URL",       "http://localhost:8002")
+PROMETHEUS_URL = os.getenv("PROMETHEUS_URL", "http://localhost:9090")
+
+MINIO_ENDPOINT   = os.getenv("MINIO_ENDPOINT",   "http://10.56.2.170:30900")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY",  "minioadmin")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY",  "minioadmin123")
+BUCKET           = os.getenv("MINIO_BUCKET",       "warehouse")
 
 # Promotion rules (well-justified)
 STAGING_WAIT_S           = 300   # wait 5 minutes before evaluating staging
