@@ -125,7 +125,7 @@ The training deployment assumes:
 
 - infrastructure bootstrap has already completed
 - `minio-secret` already exists in `mlops`
-- the image `jellyfin-training:latest` has already been built from `training/Dockerfile` and is available to the node
+- the image `docker.io/library/jellyfin-training:latest` has already been built from `training/Dockerfile` and imported into the node runtime
 
 From a Linux shell with `kubectl` configured for the target cluster:
 

@@ -19,7 +19,7 @@ Deploy the training-layer resources:
 Assumptions:
   - namespace mlops already exists
   - minio-secret already exists
-  - the image jellyfin-training:latest is already built and available to the node
+  - the image docker.io/library/jellyfin-training:latest is already imported into the node runtime
 EOF
 }
 

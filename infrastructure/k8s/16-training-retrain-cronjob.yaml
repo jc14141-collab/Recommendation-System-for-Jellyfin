@@ -20,8 +20,8 @@ spec:
           restartPolicy: Never
           containers:
             - name: retrain
-              image: jellyfin-training:latest
-              imagePullPolicy: IfNotPresent
+              image: docker.io/library/jellyfin-training:latest
+              imagePullPolicy: Never
               workingDir: /app
               command:
                 - python
