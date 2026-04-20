@@ -248,6 +248,13 @@ class SimulatorService:
 			return
 
 		candidate_url = self.incremental_request_cfg.get("uri", "http://online_service:18080/candidates")
+		raw_inference = self.incremental_request_cfg.get("inference", False)
+		if isinstance(raw_inference, str):
+			inference = raw_inference.strip().lower() in {"1", "true", "yes", "on"}
+		else:
+			inference = bool(raw_inference)
+		inference_uri = self.incremental_request_cfg.get("inference_uri", "http://training-manager:8096")
+		model_version = str(self.incremental_request_cfg.get("model_version", "latest"))
 		top_k = int(self.incremental_request_cfg.get("top_k", self.cfg.candidate_request_top_k))
 		timeout_seconds = float(
 			self.incremental_request_cfg.get("timeout_seconds", self.cfg.candidate_request_timeout_seconds)
@@ -259,6 +266,9 @@ class SimulatorService:
 			online_service_url=candidate_url,
 			top_k=top_k,
 			timeout_seconds=timeout_seconds,
+			inference=inference,
+			inference_service_url=str(inference_uri),
+			model_version=model_version,
 		)
 		self.state.candidate_request_done = True
 

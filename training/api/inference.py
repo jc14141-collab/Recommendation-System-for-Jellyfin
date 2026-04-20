@@ -272,8 +272,10 @@ class RecommendationEngine:
                         'candidate_score': float(items[idx].get('score', 0)),
                     })
 
+
         else:
             sorted_items = sorted(items, key=lambda x: x.get('score', 0), reverse=True)[:20]
+            max_score = max(item.get('score', 1) for item in sorted_items) or 1  # avoid division by zero
             results = []
             for i, item in enumerate(sorted_items):
                 mid = item["movie_id"]
@@ -282,7 +284,7 @@ class RecommendationEngine:
                     'movie_id': mid,
                     'title': info.get('title', f'Movie {mid}'),
                     'genres': info.get('genres', 'Unknown'),
-                    'score': float(item.get('score', 0)),
+                    'score': round(float(item.get('score', 0)) / max_score, 4),  # normalize to 0-1
                     'method': 'popular_fallback',
                     'candidate_rank': item.get('rank', i + 1),
                     'candidate_score': float(item.get('score', 0)),

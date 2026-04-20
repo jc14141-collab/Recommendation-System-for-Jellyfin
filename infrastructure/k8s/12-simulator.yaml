@@ -24,7 +24,7 @@ spec:
             - until nc -z api 8080; do echo "waiting for api:8080"; sleep 2; done
       containers:
         - name: simulator
-          image: songchenxue/simulator:v1.0
+          image: songchenxue/simulator:v1.1
           imagePullPolicy: IfNotPresent
           workingDir: /app
           command:

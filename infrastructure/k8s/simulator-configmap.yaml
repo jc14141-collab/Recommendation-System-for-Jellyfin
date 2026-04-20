@@ -59,6 +59,9 @@ data:
     incremental_request:
       enabled: true           # Whether to enable incremental candidates requests
       uri: "http://online-service:18080/candidates"  # The candidates API endpoint of the online service
+      inference: true
+      inference_uri: "http://training-manager:8096"
+      model_version: "latest"
       top_k: 20
       timeout_seconds: 10.0
 

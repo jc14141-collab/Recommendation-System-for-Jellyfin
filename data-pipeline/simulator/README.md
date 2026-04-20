@@ -45,6 +45,34 @@ docker compose exec simulator python scripts/main.py --config scripts/config.yam
 - watch duration ranges
 - ingest API settings
 
+## Incremental Request Inference Switch
+
+`incremental_request` now supports two modes:
+
+- `inference: false` (default): keep original behavior and call `uri` with query params `user_id` + `top_k`.
+- `inference: true`: call training manager endpoint:
+
+```bash
+curl -G "http://training-manager:8096/api/recommend/49171088" \
+	--data-urlencode "top_n=10" \
+	--data-urlencode "model_version=latest"
+```
+
+When `inference: true`, simulator will normalize response fields into `items` for downstream ranking.
+It is compatible with upstream keys `recommendations` (preferred) and `recommend`.
+
+Example:
+
+```yaml
+incremental_request:
+	enabled: true
+	inference: true
+	inference_uri: "http://training-manager:8096"
+	model_version: "latest"
+	top_k: 20
+	timeout_seconds: 10.0
+```
+
 Adjust this file to make the simulation lighter, heavier, shorter, or more API-focused.
 
 
