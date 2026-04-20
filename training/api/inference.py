@@ -18,7 +18,10 @@ from scripts.data_loader import S3Config, build_boto3_s3_client, build_arrow_s3_
 from scripts.retrain import RecommenderMLP
 
 
-CANDIDATE_API = "http://10.43.252.8:18080/candidates"
+CANDIDATE_API = os.environ.get(
+    "CANDIDATE_API",
+    "http://online-service.mlops.svc.cluster.local:18080/candidates",
+)
 SERVING_URL = os.environ.get("SERVING_URL", "http://localhost:8002")
 
 class RecommendationEngine:
