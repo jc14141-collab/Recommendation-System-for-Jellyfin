@@ -25,6 +25,7 @@ from fastapi import FastAPI, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 import mlflow
 from mlflow.tracking import MlflowClient
@@ -47,6 +48,12 @@ CONFIG_PATH = "configs/config.yaml"
 ADMIN_PASSWORD = "admin123"
 
 mlflow.set_tracking_uri(MLFLOW_URI)
+
+class FeedbackRequest(BaseModel):
+    request_id: str
+    user_id: str
+    clicked_movie_id: str
+    clicked_rank: int
 
 # ── State ──
 training_state = {
@@ -173,6 +180,22 @@ def get_history():
     runs = get_experiment_runs()
     return {"runs": [run_to_dict(r) for r in runs]}
 
+
+@app.post("/api/feedback")
+async def proxy_feedback(body: FeedbackRequest):
+    """Proxy feedback to serving pod (browser cannot reach serving directly)"""
+    import httpx
+    serving_url = os.environ.get("SERVING_URL", "http://recommender-serving:8000")
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{serving_url}/feedback",
+                json=body.dict(),
+                timeout=5.0,
+            )
+        return resp.json()
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
 
 @app.get("/api/logs")
 def get_logs():

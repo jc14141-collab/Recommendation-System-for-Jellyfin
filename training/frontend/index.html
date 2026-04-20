@@ -629,7 +629,7 @@ function sendFeedback(movieId, rank, btn) {
   }
 
   var SERVING = window.location.protocol + '//' + window.location.hostname + ':30082';
-  fetch(SERVING + '/feedback', {
+  fetch('/api/feedback', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
