@@ -55,11 +55,11 @@ spec:
               name: http
           resources:
             requests:
-              cpu: 250m
-              memory: 512Mi
+              cpu: 500m
+              memory: 768Mi
             limits:
-              cpu: "1"
-              memory: 1Gi
+              cpu: "2"
+              memory: 1500Mi
           readinessProbe:
             httpGet:
               path: /health
@@ -130,11 +130,11 @@ spec:
               name: http
           resources:
             requests:
-              cpu: 250m
-              memory: 512Mi
+              cpu: 500m
+              memory: 768Mi
             limits:
-              cpu: "1"
-              memory: 1Gi
+              cpu: "2"
+              memory: 1500Mi
           readinessProbe:
             httpGet:
               path: /health
@@ -222,11 +222,11 @@ spec:
               name: http
           resources:
             requests:
-              cpu: 250m
-              memory: 512Mi
+              cpu: 500m
+              memory: 768Mi
             limits:
-              cpu: "1"
-              memory: 1Gi
+              cpu: "2"
+              memory: 1500Mi
           readinessProbe:
             httpGet:
               path: /health
