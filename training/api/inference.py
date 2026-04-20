@@ -18,7 +18,7 @@ from scripts.data_loader import S3Config, build_boto3_s3_client, build_arrow_s3_
 from scripts.retrain import RecommenderMLP
 
 
-CANDIDATE_API = "http://10.43.252.8:18080/candidates"
+CANDIDATE_API = os.environ.get("CANDIDATE_API", "http://online-service.mlops.svc.cluster.local:18080/candidates")
 SERVING_URL = os.environ.get("SERVING_URL", "http://localhost:8002")
 
 class RecommendationEngine:
@@ -84,6 +84,56 @@ class RecommendationEngine:
         self.loaded_model_key = model_key
         print("  Model loaded!")
 
+    def _get_popular_fallback(self, top_n: int) -> list:
+        try:
+            if not self.movie_info:
+                self.load_movies_csv()
+            TOP_MOVIE_IDS = [
+                318,
+                858,
+                527,
+                1221,
+                2959,
+                1193,
+                50,
+                593,
+                260,
+                1196,
+                4993,
+                7153,
+                296,
+                356,
+                2571,
+                589,
+                1270,
+                364,
+                3578,
+                2858,
+            ]
+            ordered = [mid for mid in TOP_MOVIE_IDS if mid in self.movie_info]
+            existing = set(ordered)
+            for mid in self.movie_info:
+                if mid not in existing:
+                    ordered.append(mid)
+                    ordered.append(mid)
+            movie_ids = ordered[:top_n]
+            results = []
+            for i, mid in enumerate(movie_ids):
+                info = self.movie_info.get(mid, {})
+                results.append({
+                    'movie_id': mid,
+                    'title': info.get('title', f'Movie {mid}'),
+                    'genres': info.get('genres', 'Unknown'),
+                    'score': 0.0,
+                    'method': 'popular_fallback_minio',
+                    'candidate_rank': i + 1,
+                    'candidate_score': 0.0,
+                })
+            return results
+        except Exception as e:
+            print(f"[inference] MinIO fallback failed: {e}")
+            return []
+
     def recommend(self, user_id, top_n=10, model_key=None):
         if model_key:
             self.load_model(model_key)
@@ -99,11 +149,19 @@ class RecommendationEngine:
             )
             resp.raise_for_status()
             data = resp.json()
+            items = data.get("items", [])
         except Exception as e:
-            return None, f"Candidate API error: {str(e)}"
+            print(f"[inference] Candidate API failed: {e}, using MinIO popular fallback")
+            fallback = self._get_popular_fallback(top_n)
+            if fallback:
+                return fallback, None
+            return None, f"Candidate API error and MinIO fallback failed: {str(e)}"
 
-        items = data.get("items", [])
         if not items:
+            print(f"[inference] No candidates for user {user_id}, using MinIO popular fallback")
+            fallback = self._get_popular_fallback(top_n)
+            if fallback:
+                return fallback, None
             return None, f"No candidates for user {user_id}"
 
         category = data.get("category", "popular")
@@ -164,20 +222,31 @@ class RecommendationEngine:
                 movie_ids = [item["movie_id"] for item in items]
                 movie_embs = np.array([item["embedding"] for item in items], dtype=np.float32)
                 user_embs = np.tile(user_emb, (len(movie_ids), 1))
-                # LightGBM reranking
+
                 if hasattr(self, '_model_type') and self._model_type == 'lightgbm':
-                    cosine_sim = np.sum(user_embs * movie_embs, axis=1) / (np.linalg.norm(user_embs, axis=1) * np.linalg.norm(movie_embs, axis=1) + 1e-8)
+                    cosine_sim = np.sum(user_embs * movie_embs, axis=1) / (
+                                np.linalg.norm(user_embs, axis=1) * np.linalg.norm(movie_embs, axis=1) + 1e-8)
                     dot_product = np.sum(user_embs * movie_embs, axis=1)
                     l2_dist = np.linalg.norm(user_embs - movie_embs, axis=1)
-                    X = np.hstack([user_embs, movie_embs, cosine_sim.reshape(-1,1), dot_product.reshape(-1,1), l2_dist.reshape(-1,1)])
+                    X = np.hstack([user_embs, movie_embs, cosine_sim.reshape(-1, 1), dot_product.reshape(-1, 1),
+                                   l2_dist.reshape(-1, 1)])
                     scores = self.model.predict(X)
                     ranked_idx = np.argsort(scores)[::-1][:top_n]
                     results = []
                     for idx in ranked_idx:
                         mid = movie_ids[idx]
                         info = self.movie_info.get(mid, {})
-                        results.append({'movie_id': mid, 'title': info.get('title', f'Movie {mid}'), 'genres': info.get('genres', 'Unknown'), 'score': float(scores[idx]), 'method': 'lightgbm_reranking', 'candidate_rank': items[idx].get('rank', 0), 'candidate_score': float(items[idx].get('score', 0))})
+                        results.append({
+                            'movie_id': mid,
+                            'title': info.get('title', f'Movie {mid}'),
+                            'genres': info.get('genres', 'Unknown'),
+                            'score': float(scores[idx]),
+                            'method': 'lightgbm_reranking',
+                            'candidate_rank': items[idx].get('rank', 0),
+                            'candidate_score': float(items[idx].get('score', 0)),
+                        })
                     return results, None
+
                 with torch.no_grad():
                     user_t = torch.tensor(user_embs, dtype=torch.float32)
                     movie_t = torch.tensor(movie_embs, dtype=torch.float32)
@@ -199,7 +268,6 @@ class RecommendationEngine:
                     })
 
         else:
-
             sorted_items = sorted(items, key=lambda x: x.get('score', 0), reverse=True)[:20]
             results = []
             for i, item in enumerate(sorted_items):
