@@ -1,0 +1,272 @@
+services:
+  # --- INFRASTRUCTURE LAYER ---
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - /mnt/block/postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    env_file: .env
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000" # API
+      - "9001:9001" # Console
+    volumes:
+      - /mnt/object/minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- INITIALIZATION LAYER ---
+  minio-init:
+    image: minio/mc
+    container_name: minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+      mc mb --ignore-existing myminio/warehouse;
+      mc mb --ignore-existing myminio/raw;
+      mc mb --ignore-existing myminio/cleaned;
+      mc mb --ignore-existing myminio/artifacts;
+      mc mb --ignore-existing myminio/embedding;
+      exit 0;
+      "
+
+  # --- DATA ENGINEERING LAYER ---
+  bootstraper:
+    build: ./bootstraper
+    container_name: bootstraper
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    volumes:
+      - /mnt/object/minio_data/artifacts:/data/artifacts
+      - /mnt/object/minio_data/raw:/data/raw
+      - /mnt/object/minio_data:/data
+      - ./bootstraper:/app
+      - /mnt/object/minio_data/embedding:/data/embedding
+      - /mnt/block/embedding/:/mnt/block/embedding
+    working_dir: /app
+    command: tail -f /dev/null # Keep alive for manual execution/debug
+    environment:
+      POSTGRES_HOST: postgres
+      MINIO_ENDPOINT: http://minio:9000
+      # PyIceberg specific env vars
+      PYICEBERG_CATALOG__DEFAULT__TYPE: sql
+      PYICEBERG_CATALOG__DEFAULT__URI: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      PYICEBERG_CATALOG__DEFAULT__S3__ENDPOINT: http://minio:9000
+      PYICEBERG_CATALOG__DEFAULT__WAREHOUSE: s3://warehouse/
+      KAGGLE_API_TOKEN: ${KAGGLE_API_TOKEN}
+
+  pipeline:
+    build: ./pipeline
+    container_name: pipeline
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - /mnt/object/minio_data/artifacts:/data/artifacts
+      - /mnt/block/cache:/data/cache
+      - /mnt/object/minio_data/warehouse:/data/warehouse
+      - /mnt/object/minio_data:/data
+      - /mnt/object/tmp:/data/tmp
+      - ./pipeline:/app
+    working_dir: /app
+    # Execute ingestion script then exit
+    command: tail -f /dev/null # Keep alive for manual execution/debug
+    environment:
+      POSTGRES_HOST: postgres
+      MINIO_ENDPOINT: http://minio:9000
+      ARTIFACTS_PATH: /data/artifacts
+
+  # --- APPLICATION LAYER ---
+  api:
+    build: ./api
+    container_name: api
+    env_file: .env
+    ports:
+      - "18081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./api:/app
+    command: gunicorn -w 2 -b 0.0.0.0:8080 "scripts.app:create_app()"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+  online_service:
+    build: ./online_service
+    container_name: online_service
+    env_file: .env
+    ports:
+      - "18080:18080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /mnt/block/artifacts:/data/artifacts:ro # Read-only model access
+      - /mnt/block/embedding:/data/embedding
+      - ./online_service:/app
+    command: gunicorn -w 2 -b 0.0.0.0:18080 "scripts.api.candidate_api:create_app()"
+    environment:
+      POSTGRES_HOST: postgres
+      MINIO_ENDPOINT: http://minio:9000
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+  simulator:
+    build: ./simulator
+    container_name: simulator
+    env_file: .env
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+    command: tail -f /dev/null
+    volumes:
+      - ./simulator:/app
+      - /mnt/block/embedding:/data/embedding
+    environment:
+      POSTGRES_HOST: postgres
+      MINIO_ENDPOINT: http://minio:9000
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+  # --- OBSERVABILITY LAYER ---
+  adminer:
+    image: adminer
+    container_name: adminer
+    ports:
+      - "5050:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      - postgres
+
+  # --- AIR FLOW ---
+  airflow-init:
+    build: ./airflow
+    container_name: airflow-init
+    user: "0:0"
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+          set -e
+
+          airflow db migrate
+
+          airflow users create \
+            --username "${AIRFLOW_ADMIN_USERNAME}" \
+            --password "${AIRFLOW_ADMIN_PASSWORD}" \
+            --firstname Airflow \
+            --lastname Admin \
+            --role Admin \
+            --email "${AIRFLOW_ADMIN_EMAIL}" || true
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./:/opt/project
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  airflow-webserver:
+    build: ./airflow
+    container_name: airflow-webserver
+    user: "0:0"
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: webserver
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./:/opt/project
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  airflow-scheduler:
+    build: ./airflow
+    container_name: airflow-scheduler
+    user: "0:0"
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: scheduler
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./:/opt/project
+      - /var/run/docker.sock:/var/run/docker.sock
