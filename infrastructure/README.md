@@ -194,11 +194,35 @@ From Windows PowerShell:
 .\scripts\deploy-k8s-serving.ps1
 ```
 
-This first serving deployment targets the prod multiworker recommender only and exposes:
+This serving deployment includes six runtime components aligned with the multiworker compose setup:
 
-- internal service: `http://recommender-serving:8000`
-- external NodePort: `http://<node-ip>:30080`
-- image: `songchenxue/project25-serving-multiworker:latest`
+- `serving-staging`
+- `serving-canary`
+- `recommender-serving` / `serving-prod`
+- `node-exporter`
+- `prometheus`
+- `grafana`
+
+The serving endpoints are:
+
+- prod alias for training and app consumers: `http://recommender-serving:8000`
+- prod direct service: `http://serving-prod:8000`
+- staging direct service: `http://serving-staging:8000`
+- canary direct service: `http://serving-canary:8000`
+
+The external NodePorts are:
+
+- prod alias: `http://<node-ip>:30080`
+- prod direct: `http://<node-ip>:30082`
+- staging: `http://<node-ip>:30083`
+- canary: `http://<node-ip>:30084`
+- Prometheus: `http://<node-ip>:30090`
+- Grafana: `http://<node-ip>:30030`
+- node exporter metrics: `http://<node-ip>:30100/metrics`
+
+The serving image is:
+
+- `songchenxue/project25-serving-multiworker:latest`
 
 From Windows PowerShell:
 
