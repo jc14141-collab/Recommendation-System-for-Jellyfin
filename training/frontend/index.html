@@ -217,6 +217,14 @@
             <label style="font-size:13px;color:var(--text-muted)">Dataset:</label>
             <select id="uVersionSelect" class="select-field" style="min-width:120px"><option>Loading...</option></select>
           </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <label style="font-size:13px;color:var(--text-muted)">Base Model:</label>
+            <select id="uModelSelect" class="select-field" style="min-width:160px">
+              <option value="mlp">MLP (512-256-128)</option>
+              <option value="mlp_large">MLP Large (1024-512-256-128)</option>
+              <option value="lightgbm" disabled>LightGBM (inference only)</option>
+            </select>
+          </div>
           <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
             <button id="uRetrainBtn" class="btn btn-primary" onclick="doRetrain('u')">Retrain Now</button>
             <span id="uLastTrained" style="font-size:12px;color:var(--text-muted)"></span>
@@ -315,8 +323,16 @@
           <h3>Retrain Model</h3>
           <p>Load latest weights, fine-tune on new data, save with version tracking.</p>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-            <label style="font-size:13px;color:var(--text-muted)">Dataset:</label>
+    <label style="font-size:13px;color:var(--text-muted)">Dataset:</label>
             <select id="aVersionSelect" class="select-field" style="min-width:120px"><option>Loading...</option></select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <label style="font-size:13px;color:var(--text-muted)">Base Model:</label>
+            <select id="aModelSelect" class="select-field" style="min-width:160px">
+              <option value="mlp">MLP (512-256-128)</option>
+              <option value="mlp_large">MLP Large (1024-512-256-128)</option>
+              <option value="lightgbm" disabled>LightGBM (inference only)</option>
+            </select>
           </div>
           <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
             <button id="aRetrainBtn" class="btn btn-primary" onclick="doRetrain('a')">Retrain Now</button>
@@ -439,12 +455,13 @@ function loginAdmin() {
     .then(function(res) {
       if (!res.ok) { document.getElementById('adminError').textContent = res.data.error; return; }
       currentRole = 'admin';
+      navigateTo('admin');
       var userSel = document.getElementById('adminUserSelect');
       userSel.innerHTML = res.data.users.map(function(u) { return '<option value="' + u + '">User ' + u + '</option>'; }).join('');
       document.getElementById('adminUserInput').value = '';
       var modelSel = document.getElementById('modelSelect');
-      modelSel.innerHTML = res.data.models.map(function(m) { return '<option value="' + m + '"' + (m === 'latest' ? ' selected' : '') + '>' + m + '</option>'; }).join('');
-      navigateTo('admin');
+      var vers = res.data.models.filter(function(m){ return m==='latest'||m==='v0001'||m==='v0002'; });
+      modelSel.innerHTML = '<optgroup label="MLP (512-256-128)">' + vers.map(function(m){return '<option value="mlp/'+m+'">MLP - '+m+'</option>';}).join('') + '</optgroup>' + '<optgroup label="MLP Large (1024-512-256-128)">' + '<option value="mlp_large/latest">MLP Large - latest</option>' + '</optgroup>' + '<optgroup label="LightGBM">' + '<option value="lightgbm/latest">LightGBM - latest</option>' + '</optgroup>';
       loadCommonData('a');
       fetchAdminRec();
     })
@@ -539,7 +556,9 @@ function loadDatasets(p) {
 function doRetrain(p) {
   var sel = document.getElementById(p+'VersionSelect');
   var version = sel ? sel.value : '';
-  var url = version ? API+'/api/retrain/'+version : API+'/api/retrain';
+  var modelSel = document.getElementById(p+'ModelSelect');
+  var baseModel = modelSel ? modelSel.value : 'mlp';
+  var url = version ? API+'/api/retrain/'+version+'?base_model='+baseModel : API+'/api/retrain?base_model='+baseModel;
   fetch(url, {method:'POST'}).then(function(r){return r.json();}).then(function(data) {
     if (data.message) {
       setBadge(p, 'training');

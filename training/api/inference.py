@@ -48,6 +48,15 @@ class RecommendationEngine:
         print("Embeddings will be fetched from candidate API on demand")
 
     def load_model(self, model_key="models/mlp/latest/model_mlp_best.pt"):
+        if "lightgbm" in model_key:
+            import lightgbm as lgb
+            local_path = "/tmp/inference_model_lgb.txt"
+            self.client.download_file("warehouse", model_key, local_path)
+            self.model = lgb.Booster(model_file=local_path)
+            self.loaded_model_key = model_key
+            self._model_type = "lightgbm"
+            print("  LightGBM model loaded!")
+            return
         if self.loaded_model_key == model_key and self.model is not None:
             return
 
@@ -55,9 +64,13 @@ class RecommendationEngine:
         local_path = "/tmp/inference_model.pt"
         self.client.download_file("warehouse", model_key, local_path)
 
+        if "mlp_large" in model_key:
+            hidden_dims = [1024, 512, 256, 128]
+        else:
+            hidden_dims = [512, 256, 128]
         self.model = RecommenderMLP(
             embedding_dim=self.data_cfg.get('embedding_dim', 384),
-            hidden_dims=[512, 256, 128],
+            hidden_dims=hidden_dims,
             dropout=0.0,
         )
 
@@ -151,7 +164,20 @@ class RecommendationEngine:
                 movie_ids = [item["movie_id"] for item in items]
                 movie_embs = np.array([item["embedding"] for item in items], dtype=np.float32)
                 user_embs = np.tile(user_emb, (len(movie_ids), 1))
-
+                # LightGBM reranking
+                if hasattr(self, '_model_type') and self._model_type == 'lightgbm':
+                    cosine_sim = np.sum(user_embs * movie_embs, axis=1) / (np.linalg.norm(user_embs, axis=1) * np.linalg.norm(movie_embs, axis=1) + 1e-8)
+                    dot_product = np.sum(user_embs * movie_embs, axis=1)
+                    l2_dist = np.linalg.norm(user_embs - movie_embs, axis=1)
+                    X = np.hstack([user_embs, movie_embs, cosine_sim.reshape(-1,1), dot_product.reshape(-1,1), l2_dist.reshape(-1,1)])
+                    scores = self.model.predict(X)
+                    ranked_idx = np.argsort(scores)[::-1][:top_n]
+                    results = []
+                    for idx in ranked_idx:
+                        mid = movie_ids[idx]
+                        info = self.movie_info.get(mid, {})
+                        results.append({'movie_id': mid, 'title': info.get('title', f'Movie {mid}'), 'genres': info.get('genres', 'Unknown'), 'score': float(scores[idx]), 'method': 'lightgbm_reranking', 'candidate_rank': items[idx].get('rank', 0), 'candidate_score': float(items[idx].get('score', 0))})
+                    return results, None
                 with torch.no_grad():
                     user_t = torch.tensor(user_embs, dtype=torch.float32)
                     movie_t = torch.tensor(movie_embs, dtype=torch.float32)

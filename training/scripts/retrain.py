@@ -250,6 +250,7 @@ def compute_ranking_metrics(user_ids, movie_ids, labels, scores, k=10):
 def main():
     parser = argparse.ArgumentParser(description="IndieFlicks MLP Retraining")
     parser.add_argument("--config", type=str, default="configs/config.yaml")
+    parser.add_argument("--base-model", type=str, default="mlp", choices=["mlp", "mlp_large"])
     parser.add_argument("--version", type=str, default=None, help="Override data version")
     args = parser.parse_args()
 
@@ -288,11 +289,17 @@ def main():
     val_loader = build_loader(s3_cfg, data_cfg, "val", shuffle=False, return_ids=True)
 
     # Model
-    model_cfg = config["models"]["mlp"]["params"]
+    base_model = args.base_model if hasattr(args, 'base_model') else "mlp"
+    model_configs = {
+        "mlp": {"hidden_dims": [512, 256, 128], "dropout": 0.3, "lr": 0.0005, "wd": 0.0001, "epochs": 20},
+        "mlp_large": {"hidden_dims": [1024, 512, 256, 128], "dropout": 0.2, "lr": 0.0003, "wd": 0.00005, "epochs": 20},
+    }
+    mcfg = model_configs.get(base_model, model_configs["mlp"])
+    model_cfg = config.get("models", {}).get(base_model, {}).get("params", mcfg)
     model = RecommenderMLP(
         embedding_dim=data_cfg.get("embedding_dim", 384),
-        hidden_dims=model_cfg["hidden_dims"],
-        dropout=model_cfg["dropout"],
+        hidden_dims=model_cfg.get("hidden_dims", mcfg["hidden_dims"]),
+        dropout=model_cfg.get("dropout", mcfg["dropout"]),
     ).to(device)
 
     param_count = sum(p.numel() for p in model.parameters())
@@ -305,6 +312,7 @@ def main():
 
         source = pretrained_cfg.get("source", "local")
         if source == "s3":
+            s3_key = pretrained_cfg["s3_key"].replace("/mlp/", f"/{base_model}/")
             download_weights_from_s3(
                 s3_cfg,
                 pretrained_cfg["s3_bucket"],

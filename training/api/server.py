@@ -110,7 +110,7 @@ def run_to_dict(run):
     }
 
 
-def run_retrain(version=None):
+def run_retrain(version=None, base_model="mlp"):
     global training_state
     training_state["status"] = "training"
     training_state["logs"] = ["Starting retraining..."]
@@ -182,20 +182,19 @@ def get_logs():
 
 
 @app.post("/api/retrain")
-def trigger_retrain(background_tasks: BackgroundTasks):
+def trigger_retrain(background_tasks: BackgroundTasks, base_model: str = "mlp"):
     if training_state["status"] == "training":
         return JSONResponse(status_code=409, content={"error": "Training already in progress"})
-    background_tasks.add_task(run_retrain)
-    return {"message": "Retraining started", "status": "training"}
+    background_tasks.add_task(run_retrain, None, base_model)
+    return {"message": f"Retraining started ({base_model})", "status": "training"}
 
 
 @app.post("/api/retrain/{version}")
-def trigger_retrain_version(version: str, background_tasks: BackgroundTasks):
+def trigger_retrain_version(version: str, background_tasks: BackgroundTasks, base_model: str = "mlp"):
     if training_state["status"] == "training":
         return JSONResponse(status_code=409, content={"error": "Training already in progress"})
-    background_tasks.add_task(run_retrain, version)
-    return {"message": f"Retraining started with data {version}", "status": "training"}
-
+    background_tasks.add_task(run_retrain, version, base_model)
+    return {"message": f"Retraining started with data {version} ({base_model})", "status": "training"}
 
 @app.get("/api/schedule")
 def get_schedule():
@@ -317,7 +316,16 @@ def login(role: str = "user", user_id: int = None, password: str = None):
 @app.get("/api/recommend/{user_id}")
 def recommend(user_id: int, top_n: int = 10, model_version: str = "latest"):
     eng = get_engine()
-    model_key = f"models/mlp/{model_version}/model_mlp_best.pt"
+    if "/" in model_version:
+        model_type, ver = model_version.split("/", 1)
+    else:
+        model_type, ver = "mlp", model_version
+    if model_type == "mlp_large":
+        model_key = f"models/{model_type}/{ver}/model_mlp_large_best.pt"
+    elif model_type == "lightgbm":
+        model_key = f"models/{model_type}/{ver}/model_lightgbm.txt"
+    else:
+        model_key = f"models/{model_type}/{ver}/model_mlp_best.pt"
     results, error = eng.recommend(user_id, top_n=top_n, model_key=model_key)
     if error:
         return JSONResponse(status_code=404, content={"error": error})
