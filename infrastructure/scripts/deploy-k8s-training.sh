@@ -6,7 +6,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TRAINING_DIR="${REPO_ROOT}/k8s/training"
 NAMESPACE="${NAMESPACE:-mlops}"
 WAIT_TIMEOUT="${WAIT_TIMEOUT:-300s}"
-IMAGE_REF="${IMAGE_REF:-docker.io/library/jellyfin-training:latest}"
+IMAGE_REF="${IMAGE_REF:-songchenxue/jellyfin-training:latest}"
 
 usage() {
   cat <<'EOF'
@@ -20,7 +20,7 @@ Deploy the training-layer resources:
 Assumptions:
   - namespace mlops already exists
   - minio-secret already exists
-  - the image docker.io/library/jellyfin-training:latest is already imported into the node runtime
+  - the image songchenxue/jellyfin-training:latest is already imported into the node runtime
 
 Recommended flow:
   1. ./scripts/import-training-image.sh

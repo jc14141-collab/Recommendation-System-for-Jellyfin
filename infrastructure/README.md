@@ -135,7 +135,7 @@ The training deployment assumes:
 
 - infrastructure bootstrap has already completed
 - `minio-secret` already exists in `mlops`
-- the image `docker.io/library/jellyfin-training:latest` has already been built from `training/Dockerfile` and imported into the node runtime
+- the image `songchenxue/jellyfin-training:latest` has already been built from `training/Dockerfile`, pushed, and imported into the node runtime
 
 On the Linux node, prepare the image with:
 
