@@ -6,6 +6,7 @@ metadata:
   namespace: mlops
 data:
   MLFLOW_TRACKING_URI: http://mlflow.mlops.svc.cluster.local:5000
+  MLFLOW_PUBLIC_URL: http://129.114.25.107:30500
   S3_ENDPOINT: http://minio.mlops.svc.cluster.local:9000
   GIT_PYTHON_REFRESH: quiet
   CANDIDATE_API: http://online-service.mlops.svc.cluster.local:18080/candidates

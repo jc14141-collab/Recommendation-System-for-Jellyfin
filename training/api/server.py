@@ -40,6 +40,7 @@ app.add_middleware(
 
 # ── Config ──
 MLFLOW_URI = os.environ.get("MLFLOW_TRACKING_URI", "http://129.114.25.107:30500")
+MLFLOW_PUBLIC_URL = os.environ.get("MLFLOW_PUBLIC_URL", MLFLOW_URI)
 EXPERIMENT_NAME = "indieflicks-recommender"
 RETRAIN_SCRIPT = "scripts/retrain.py"
 CONFIG_PATH = "configs/config.yaml"
@@ -106,7 +107,7 @@ def run_to_dict(run):
             "ndcg_10": metrics.get("ndcg_10"),
             "total_wall_time_sec": metrics.get("total_wall_time_sec"),
         },
-        "mlflow_url": f"{MLFLOW_URI}/#/experiments/{run.info.experiment_id}/runs/{info.run_id}",
+        "mlflow_url": f"{MLFLOW_PUBLIC_URL}/#/experiments/{run.info.experiment_id}/runs/{info.run_id}",
     }
 
 
@@ -163,7 +164,7 @@ def get_status():
         "started_at": training_state["started_at"],
         "finished_at": training_state["finished_at"],
         "current_model": latest,
-        "mlflow_uri": MLFLOW_URI,
+        "mlflow_uri": MLFLOW_PUBLIC_URL,
     }
 
 
