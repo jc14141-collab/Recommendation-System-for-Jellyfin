@@ -142,6 +142,15 @@ echo " Step 8: start monitor.py"
 echo "========================================"
 pkill -f "monitor.py" 2>/dev/null || true
 
+export MINIO_ENDPOINT=http://10.56.2.170:30900
+export MINIO_ACCESS_KEY=minioadmin
+export MINIO_SECRET_KEY=minioadmin123
+export MINIO_BUCKET=warehouse
+export STAGING_URL=http://localhost:8003
+export CANARY_URL=http://localhost:8004
+export PROD_URL=http://localhost:8002
+export PROMETHEUS_URL=http://localhost:9090
+
 nohup python3 "$PROJECT_ROOT/scripts/monitor.py" > /tmp/monitor.log 2>&1 &
 MONITOR_PID=$!
 echo "Monitor started with PID: $MONITOR_PID"
