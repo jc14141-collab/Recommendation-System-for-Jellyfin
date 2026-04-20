@@ -6,17 +6,28 @@ metadata:
   namespace: mlops
 data:
   services: |
+    multiworker:
+      docker_source:
+        - ../../serving/serving/multiworker/Dockerfile
+        - ../../serving/serving/multiworker/app/main.py
+        - ../../serving/serving/multiworker/app/recommender.py
+      kubernetes_equivalent:
+        - ConfigMap
+        - Deployment
+        - Service
+      implemented_in_repo:
+        - k8s/17-serving-config.yaml
+        - k8s/18-serving-multiworker.yaml
+      integration_targets:
+        - minio
+        - training-manager
+      status: implemented
     baseline:
       kubernetes_equivalent:
         - Deployment
         - Service
       status: planned
     onnx:
-      kubernetes_equivalent:
-        - Deployment
-        - Service
-      status: planned
-    multiworker:
       kubernetes_equivalent:
         - Deployment
         - Service

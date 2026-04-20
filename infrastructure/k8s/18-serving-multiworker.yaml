@@ -1,0 +1,75 @@
+# 18-serving-multiworker.yaml: prod multiworker serving deployment and service
+apiVersion: v1
+kind: Service
+metadata:
+  name: recommender-serving
+  namespace: mlops
+  labels:
+    app: recommender-serving
+spec:
+  selector:
+    app: recommender-serving
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      nodePort: 30080
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommender-serving
+  namespace: mlops
+  labels:
+    app: recommender-serving
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recommender-serving
+  template:
+    metadata:
+      labels:
+        app: recommender-serving
+    spec:
+      containers:
+        - name: recommender-serving
+          image: docker.io/library/project25-serving-multiworker:latest
+          imagePullPolicy: Never
+          envFrom:
+            - configMapRef:
+                name: serving-config
+          env:
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_USER
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_PASSWORD
+          ports:
+            - containerPort: 8000
+              name: http
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 15
