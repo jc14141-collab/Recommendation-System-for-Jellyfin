@@ -123,6 +123,80 @@ The bootstrap script:
   - `13-data-api.yaml`
 - waits for `api`, `online-service-api`, `online-service-worker`, and `simulator`
 
+## Full End-to-End Deployment
+
+Use this section when starting from a new Chameleon lease or after cleaning the `mlops` namespace. The full deployment is intentionally split into three layers:
+
+1. Bootstrap infrastructure and application support services
+2. Build/import/deploy the training layer
+3. Build/import/deploy the serving layer
+
+Before running the scripts, make sure the node has K3s, Docker, Git, Python, and Docker Hub login configured. If the node only has K3s' bundled kubectl, you can use:
+
+```bash
+echo 'alias kubectl="sudo k3s kubectl"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Then run the complete deployment sequence from the repository root:
+
+```bash
+cd ~/Recommendation-System-for-Jellyfin
+git pull origin main
+
+cd ~/Recommendation-System-for-Jellyfin/infrastructure
+chmod +x scripts/*.sh
+
+export POSTGRES_DB="recsys"
+export POSTGRES_USER="recsys"
+export POSTGRES_PASSWORD="recsys123"
+export MINIO_ROOT_USER="minioadmin"
+export MINIO_ROOT_PASSWORD="minioadmin123"
+
+# 1. Infrastructure, shared platform services, config, and app support services.
+bash ./scripts/deploy-k8s-bootstrap.sh
+
+# 2. Training image and Kubernetes resources.
+bash ./scripts/import-training-image.sh
+bash ./scripts/deploy-k8s-training.sh
+
+# 3. Serving image and Kubernetes resources.
+bash ./scripts/import-serving-image.sh
+bash ./scripts/deploy-k8s-serving.sh
+```
+
+Validate the full deployment:
+
+```bash
+kubectl get pods -n mlops
+kubectl get svc -n mlops
+kubectl get cronjob -n mlops
+```
+
+Core local health checks from the node:
+
+```bash
+curl -i http://127.0.0.1:30500
+curl -i http://127.0.0.1:30900/minio/health/live
+curl -i http://127.0.0.1:30089/api/status
+curl -i http://127.0.0.1:30082/health
+curl -i http://127.0.0.1:31080/health
+```
+
+Expected external endpoints use the node or floating IP:
+
+- MLflow: `http://<node-ip>:30500`
+- Jellyfin: `http://<node-ip>:30096`
+- MinIO API: `http://<node-ip>:30900`
+- MinIO Console: `http://<node-ip>:30901`
+- Training Manager: `http://<node-ip>:30089`
+- Serving prod direct: `http://<node-ip>:30082`
+- Serving prod alias: `http://<node-ip>:31080`
+- Serving staging: `http://<node-ip>:30083`
+- Serving canary: `http://<node-ip>:30084`
+- Prometheus: `http://<node-ip>:30090`
+- Grafana: `http://<node-ip>:30030`
+
 ## Training Deployment
 
 Training is deployed separately from the infrastructure bootstrap. The current training-layer resources are:
@@ -237,9 +311,10 @@ From Windows PowerShell:
 
 ## Quick Deployment Example
 
-After SSH access to a Chameleon node is available:
+After SSH access to a Chameleon node is available, use the full sequence in [Full End-to-End Deployment](#full-end-to-end-deployment) for the current project stack. The minimal bootstrap-only example below is useful when validating only the base infrastructure layer:
 
 ```bash
+cd ~/Recommendation-System-for-Jellyfin/infrastructure
 chmod +x scripts/*.sh
 sudo ./scripts/install-k3s-server.sh
 export POSTGRES_USER="recsys"
@@ -259,14 +334,21 @@ If you are deploying from a local Windows PowerShell terminal to a Chameleon ins
 .\scripts\deploy-chameleon.ps1 -FloatingIp 129.114.25.219 -PostgresPassword "replace-with-a-real-password"
 ```
 
-This helper script copies the repository to the remote node, installs K3s unless `-SkipK3sInstall` is supplied, creates the PostgreSQL secret, applies the manifests, and waits for PostgreSQL, MLflow, and Jellyfin to become ready.
+This helper script copies the repository to the remote node, installs K3s unless `-SkipK3sInstall` is supplied, creates the PostgreSQL secret, applies the bootstrap manifests, and waits for the base infrastructure services to become ready.
 
-Expected external endpoints for the initial deployment:
+Expected external endpoints for the full deployment:
 
 - MLflow: `http://<floating-ip>:30500`
 - Jellyfin: `http://<floating-ip>:30096`
 - MinIO API: `http://<floating-ip>:30900`
 - MinIO Console: `http://<floating-ip>:30901`
-- Adminer: `http://<floating-ip>:30050`
+- Adminer: `http://<floating-ip>:5050`
+- Training Manager: `http://<floating-ip>:30089`
+- Serving prod direct: `http://<floating-ip>:30082`
+- Serving prod alias: `http://<floating-ip>:31080`
+- Serving staging: `http://<floating-ip>:30083`
+- Serving canary: `http://<floating-ip>:30084`
+- Prometheus: `http://<floating-ip>:30090`
+- Grafana: `http://<floating-ip>:30030`
 
 PostgreSQL is intended for internal service access inside the cluster.
