@@ -13,12 +13,12 @@ from botocore.client import Config
 from pathlib import Path
 import subprocess
 
-STAGING_URL    = os.getenv("STAGING_URL",    "http://localhost:8003")
-CANARY_URL     = os.getenv("CANARY_URL",     "http://localhost:8004")
-PROD_URL       = os.getenv("PROD_URL",       "http://localhost:8002")
-PROMETHEUS_URL = os.getenv("PROMETHEUS_URL", "http://localhost:9090")
+STAGING_URL    = os.getenv("STAGING_URL",    "http://localhost:30083")
+CANARY_URL     = os.getenv("CANARY_URL",     "http://localhost:30084")
+PROD_URL       = os.getenv("PROD_URL",       "http://localhost:30082")
+PROMETHEUS_URL = os.getenv("PROMETHEUS_URL", "http://localhost:30090")
 
-MINIO_ENDPOINT   = os.getenv("MINIO_ENDPOINT",   "http://10.56.2.170:30900")
+MINIO_ENDPOINT   = os.getenv("MINIO_ENDPOINT",   "http://localhost:30900")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY",  "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY",  "minioadmin123")
 BUCKET           = os.getenv("MINIO_BUCKET",       "warehouse")
@@ -35,6 +35,7 @@ WARMUP_REQUESTS          = 20    # warmup requests before evaluation
 state = {
     "staging_deployed_at": None,
     "staging_version": None,
+    "staging_etag": None,
     "canary_deployed_at": None,
     "canary_version": None,
 }
@@ -51,6 +52,18 @@ WARMUP_PAYLOAD = {
         for i in range(20)
     ]
 }
+
+DEPLOYMENTS = {
+    "staging": "serving-staging",
+    "canary": "serving-canary",
+    "prod": "serving-prod",
+}
+
+STAGING_ONNX_KEY = os.getenv(
+    "STAGING_ONNX_KEY",
+    "models/mlp/staging/model_mlp_best.onnx",
+)
+
 
 
 def build_s3():
@@ -137,31 +150,29 @@ def copy_onnx_in_minio(src_key: str, dst_key: str):
     print(f"[monitor] Copied s3://{BUCKET}/{src_key} -> s3://{BUCKET}/{dst_key}")
 
 
-def reload_serving(url: str, minio_key: str, version: str) -> bool:
-    """Restart K8s deployment so pod re-downloads ONNX from MinIO on startup"""
+def reload_serving(env: str) -> bool:
+    """Restart K8s deployment so pod re-downloads ONNX from MinIO on startup."""
     try:
-        if "30083" in url:
-            deployment = "serving-staging"
-        elif "30084" in url:
-            deployment = "serving-canary"
-        else:
-            deployment = "recommender-serving"
+        deployment = DEPLOYMENTS[env]
 
         result = subprocess.run(
             ["kubectl", "rollout", "restart", "deployment", "-n", "mlops", deployment],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
-        print(f"[monitor] Restarted {deployment}: {result.stdout.strip()}")
+        print(f"[monitor] Restarted {deployment}: {result.stdout.strip()} {result.stderr.strip()}")
 
-        # Wait for pod to be ready before continuing
-        subprocess.run(
+        status = subprocess.run(
             ["kubectl", "rollout", "status", "deployment", "-n", "mlops", deployment, "--timeout=120s"],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
-        print(f"[monitor] {deployment} is ready")
-        return True
+        print(f"[monitor] {deployment} rollout status: {status.stdout.strip()} {status.stderr.strip()}")
+
+        return status.returncode == 0
+
     except Exception as e:
-        print(f"[monitor] Reload failed: {e}")
+        print(f"[monitor] Reload failed for {env}: {e}")
         return False
 
 
@@ -213,35 +224,40 @@ def evaluate_canary() -> bool:
 def promote_staging_to_canary():
     version = state["staging_version"]
     print(f"[monitor] Promoting {version}: staging -> canary")
+
     copy_onnx_in_minio(
         "models/mlp/staging/model_mlp_best.onnx",
         "models/mlp/canary/model_mlp_best.onnx",
     )
-    reload_serving(CANARY_URL, "models/mlp/canary/model_mlp_best.onnx", version)
-    state["canary_deployed_at"] = time.time()
-    state["canary_version"] = version
-    print(f"[monitor] Canary deployed: {version}")
+
+    if reload_serving("canary"):
+        state["canary_deployed_at"] = time.time()
+        state["canary_version"] = version
+        print(f"[monitor] Canary deployed: {version}")
+    else:
+        print("[monitor] Failed to reload canary after promotion")
 
 
 def promote_canary_to_prod():
     version = state["canary_version"]
-    print(f"[monitor] Promoting {version}: canary -> prod")
+    print(f"[monitor] Promoting {version}: canary -> prod/latest")
 
-    # prod
     copy_onnx_in_minio(
         "models/mlp/canary/model_mlp_best.onnx",
         "models/mlp/prod/model_mlp_best.onnx",
     )
+
     copy_onnx_in_minio(
         "models/mlp/canary/model_mlp_best.onnx",
         "models/mlp/latest/model_mlp_best.onnx",
     )
 
-    reload_serving(PROD_URL, "models/mlp/prod/model_mlp_best.onnx", version)
-    print(f"[monitor] Production promoted: {version}")
-    print(f"[monitor] latest/ updated to match prod")
+    if reload_serving("prod"):
+        print(f"[monitor] Production promoted: {version}")
+        print("[monitor] latest/ updated to match prod")
+    else:
+        print("[monitor] Failed to reload prod after promotion")
 
-    state["staging_etag"] = state.get("staging_etag")
     state["staging_deployed_at"] = None
     state["staging_version"] = None
     state["canary_deployed_at"] = None
@@ -249,26 +265,60 @@ def promote_canary_to_prod():
 
 
 def rollback_canary():
-    """Canary failed evaluation, roll back canary to prod version"""
+    """Canary failed evaluation, roll back canary to prod version."""
     version = state.get("canary_version", "unknown")
     print(f"[monitor] Canary {version} failed evaluation, rolling back to prod version")
+
     copy_onnx_in_minio(
         "models/mlp/prod/model_mlp_best.onnx",
         "models/mlp/canary/model_mlp_best.onnx",
     )
-    reload_serving(CANARY_URL, "models/mlp/prod/model_mlp_best.onnx", "prod-version")
+
+    reload_serving("canary")
+
     state["canary_deployed_at"] = None
     state["canary_version"] = None
 
 
+def get_s3_object_etag(key: str) -> str | None:
+    try:
+        s3 = build_s3()
+        resp = s3.head_object(Bucket=BUCKET, Key=key)
+        return resp.get("ETag", "").replace('"', "")
+    except Exception as e:
+        print(f"[monitor] Could not read s3://{BUCKET}/{key}: {e}")
+        return None
+
 def check_new_staging_model():
-    """Detect new model in staging by comparing model_version from health endpoint"""
-    health = get_health(STAGING_URL)
-    version = health.get("model_version", "")
-    if version and version != state.get("staging_version"):
+    """
+    Detect new model in staging by checking MinIO object ETag.
+    When export_to_onnx overwrites staging/model_mlp_best.onnx,
+    the ETag changes, so monitor treats it as a new staging model.
+    """
+    etag = get_s3_object_etag(STAGING_ONNX_KEY)
+    if not etag:
+        print("[monitor] No staging ONNX found yet.")
+        return
+
+    previous_etag = state.get("staging_etag")
+
+    if previous_etag is None:
+        state["staging_etag"] = etag
+        print(f"[monitor] Baseline staging model recorded: {etag[:12]}")
+        return
+
+    if etag != previous_etag:
+        version = f"staging-etag-{etag[:12]}"
         print(f"[monitor] New staging model detected: {version}")
-        state["staging_deployed_at"] = time.time()
+
+        state["staging_etag"] = etag
         state["staging_version"] = version
+
+        if reload_serving("staging"):
+            state["staging_deployed_at"] = time.time()
+            print(f"[monitor] Staging reloaded for new model: {version}")
+        else:
+            print("[monitor] Failed to reload staging; will retry next check.")
 
 
 def main():

@@ -353,7 +353,7 @@ def main():
     print(f"  Max val batches: {max_val_batches or 'all'}")
 
     # MLflow run
-    run_name = datetime.now().strftime('v%Y%m%d')
+    run_name = datetime.now().strftime("v%Y%m%d%H%M%S")
     with mlflow.start_run(run_name=run_name):
         mlflow.log_param("model_type", "mlp")
         mlflow.log_param("device", str(device))
@@ -433,20 +433,30 @@ def main():
         if model_persist:
             bucket = model_persist["s3_bucket"]
 
-            # Save to version directory (e.g. models/mlp/v0002/)
-            if "version_key" in model_persist:
-                upload_model_to_s3(s3_cfg, model_save_path, bucket, model_persist["version_key"])
+            model_version = run_name
 
-            # Update latest
-            if "latest_key" in model_persist:
-                upload_model_to_s3(s3_cfg, model_save_path, bucket, model_persist["latest_key"])
+            version_pt_key = f"models/{base_model}/{model_version}/model_mlp_best.pt"
+            version_onnx_key = f"models/{base_model}/{model_version}/model_mlp_best.onnx"
+            staging_onnx_key = f"models/{base_model}/staging/model_mlp_best.onnx"
+
+            upload_model_to_s3(
+                s3_cfg,
+                model_save_path,
+                bucket,
+                version_pt_key,
+            )
+
+            print(f"[retrain] PT uploaded to version folder: {version_pt_key}")
+            print("[retrain] NOT updating latest directly. monitor.py will promote after checks.")
 
             onnx_out = config.get("onnx_output", {})
             if onnx_out:
                 from pathlib import Path
                 from scripts.export_to_onnx import export_onnx, upload_onnx
 
+                onnx_bucket = onnx_out.get("s3_bucket", bucket)
                 onnx_path = Path("/tmp/model_mlp_best.onnx")
+
                 export_onnx(
                     pt_path=Path(model_save_path),
                     onnx_path=onnx_path,
@@ -454,11 +464,26 @@ def main():
                     dropout=0.0,
                     embedding_dim=data_cfg.get("embedding_dim", 384),
                 )
+
                 s3_client = build_s3_client(s3_cfg)
-                staging_key = onnx_out.get("staging_key", "models/mlp/staging/model_mlp_best.onnx")
-                upload_onnx(s3_client, onnx_path, onnx_out["s3_bucket"], staging_key)
-                print(f"[retrain] ONNX uploaded to staging only: {staging_key}")
-                print("[retrain] monitor.py will handle staging → canary → prod promotion")
+
+                upload_onnx(
+                    s3_client,
+                    onnx_path,
+                    onnx_bucket,
+                    version_onnx_key,
+                )
+
+                upload_onnx(
+                    s3_client,
+                    onnx_path,
+                    onnx_bucket,
+                    staging_onnx_key,
+                )
+
+                print(f"[retrain] ONNX uploaded to version folder: {version_onnx_key}")
+                print(f"[retrain] ONNX uploaded to staging: {staging_onnx_key}")
+                print("[retrain] monitor.py will handle staging -> canary -> prod -> latest promotion")
 
 
         print(f"\n{'='*50}")
