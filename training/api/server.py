@@ -391,6 +391,25 @@ def recommend(user_id: int, top_n: int = 10, model_version: str = "latest"):
         return JSONResponse(status_code=404, content={"error": error})
     return {"user_id": user_id, "model_version": model_version, "recommendations": results}
 
+@app.get("/api/recommend_by_username/{username}")
+def recommend_by_username(username: str, top_n: int = 10, model_version: str = "latest"):
+    """
+    Map a Jellyfin username to a MovieLens user_id.
+    Convention: Jellyfin username should be either a number (e.g. "12345")
+    or "user_12345" format.
+    """
+    try:
+        if username.startswith("user_"):
+            user_id = int(username.replace("user_", ""))
+        else:
+            user_id = int(username)
+    except ValueError:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Cannot map Jellyfin username '{username}' to MovieLens user_id. Use a numeric username like '12345'."}
+        )
+    return recommend(user_id, top_n, model_version)
+
 
 @app.get("/api/users")
 def list_users():
