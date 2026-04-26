@@ -52,7 +52,7 @@ mlflow.set_tracking_uri(MLFLOW_URI)
 class WatchEventRequest(BaseModel):
     user_id: int
     movie_id: str
-    watch_duration_seconds: int
+    watch_duration_seconds: int | None = None
 
 class FeedbackRequest(BaseModel):
     request_id: str
@@ -207,20 +207,30 @@ async def proxy_ingest_event(body: WatchEventRequest):
     """Proxy watch event to data ingest API when user clicks Like"""
     import httpx
     import uuid
+    import random
+
     ingest_url = os.environ.get("INGEST_API_URL", "http://api:8080")
     session_id = f"sim-{body.user_id}-{uuid.uuid4().hex[:12]}"
+
+    watch_duration = (
+        body.watch_duration_seconds
+        if body.watch_duration_seconds and body.watch_duration_seconds > 0
+        else random.randint(900, 7200)
+    )
+
     payload = {
         "auth_events": [],
         "user_events": [
             {
                 "user_id": body.user_id,
-                "movie_id": int(body.movie_id) if body.movie_id.isdigit() else body.movie_id,
+                "movie_id": int(body.movie_id) if str(body.movie_id).isdigit() else body.movie_id,
                 "session_id": session_id,
                 "event_time": datetime.utcnow().isoformat() + "Z",
-                "watch_duration_seconds": body.watch_duration_seconds,
+                "watch_duration_seconds": watch_duration,
             }
-        ]
+        ],
     }
+
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -228,9 +238,28 @@ async def proxy_ingest_event(body: WatchEventRequest):
                 json=payload,
                 timeout=5.0,
             )
-        return {"status": "ok", "session_id": session_id}
+
+        try:
+            downstream_body = resp.json()
+        except Exception:
+            downstream_body = resp.text
+
+        return {
+            "status": "ok" if resp.status_code < 400 else "error",
+            "session_id": session_id,
+            "watch_duration_seconds": watch_duration,
+            "downstream_status": resp.status_code,
+            "downstream_body": downstream_body,
+            "payload_sent": payload,
+        }
+
     except Exception as e:
-        return {"status": "error", "detail": str(e)}
+        return {
+            "status": "error",
+            "detail": str(e),
+            "payload_sent": payload,
+            "ingest_url": ingest_url,
+        }
 
 
 @app.get("/api/logs")
