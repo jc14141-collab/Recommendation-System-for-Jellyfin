@@ -33,3 +33,27 @@ if you want to delete the k8s image:
 sudo crictl images | grep airflow
 sudo crictl rmi <image_id>
 ```
+
+
+### First install command
+``` bash
+cd /path/to/Recommendation-System-for-Jellyfin
+# install helm
+curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+chmod 700 get_helm.sh
+./get_helm.sh
+helm version
+
+helm repo add apache-airflow https://airflow.apache.org
+helm repo update
+
+helm install airflow apache-airflow/airflow \
+  -n airflow \
+  --create-namespace
+
+kubectl apply -f rbac/ -R
+
+helm upgrade airflow apache-airflow/airflow \
+  -n airflow \
+  -f airflow/values.yaml
+```
