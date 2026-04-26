@@ -226,6 +226,8 @@ def promote_staging_to_canary():
 def promote_canary_to_prod():
     version = state["canary_version"]
     print(f"[monitor] Promoting {version}: canary -> prod")
+
+    # prod
     copy_onnx_in_minio(
         "models/mlp/canary/model_mlp_best.onnx",
         "models/mlp/prod/model_mlp_best.onnx",
@@ -234,9 +236,12 @@ def promote_canary_to_prod():
         "models/mlp/canary/model_mlp_best.onnx",
         "models/mlp/latest/model_mlp_best.onnx",
     )
+
     reload_serving(PROD_URL, "models/mlp/prod/model_mlp_best.onnx", version)
     print(f"[monitor] Production promoted: {version}")
-    # Reset state, ready for next round
+    print(f"[monitor] latest/ updated to match prod")
+
+    state["staging_etag"] = state.get("staging_etag")
     state["staging_deployed_at"] = None
     state["staging_version"] = None
     state["canary_deployed_at"] = None

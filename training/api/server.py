@@ -49,6 +49,11 @@ ADMIN_PASSWORD = "admin123"
 
 mlflow.set_tracking_uri(MLFLOW_URI)
 
+class WatchEventRequest(BaseModel):
+    user_id: int
+    movie_id: str
+    watch_duration_seconds: int
+
 class FeedbackRequest(BaseModel):
     request_id: str
     user_id: str
@@ -196,6 +201,37 @@ async def proxy_feedback(body: FeedbackRequest):
         return resp.json()
     except Exception as e:
         return {"status": "error", "detail": str(e)}
+
+@app.post("/api/ingest-event")
+async def proxy_ingest_event(body: WatchEventRequest):
+    """Proxy watch event to data ingest API when user clicks Like"""
+    import httpx
+    import uuid
+    ingest_url = os.environ.get("INGEST_API_URL", "http://api:8080")
+    session_id = f"sim-{body.user_id}-{uuid.uuid4().hex[:12]}"
+    payload = {
+        "auth_events": [],
+        "user_events": [
+            {
+                "user_id": body.user_id,
+                "movie_id": int(body.movie_id) if body.movie_id.isdigit() else body.movie_id,
+                "session_id": session_id,
+                "event_time": datetime.utcnow().isoformat() + "Z",
+                "watch_duration_seconds": body.watch_duration_seconds,
+            }
+        ]
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{ingest_url}/ingest/events",
+                json=payload,
+                timeout=5.0,
+            )
+        return {"status": "ok", "session_id": session_id}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
 
 @app.get("/api/logs")
 def get_logs():

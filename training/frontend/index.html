@@ -618,6 +618,7 @@ function renderRecs(container, recs, requestId) {
   });
 }
 
+
 function sendFeedback(movieId, rank, btn) {
   if (btn.dataset.liked === 'true') {
     btn.dataset.liked = 'false';
@@ -628,7 +629,6 @@ function sendFeedback(movieId, rank, btn) {
     return;
   }
 
-  var SERVING = window.location.protocol + '//' + window.location.hostname + ':30082';
   fetch('/api/feedback', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -639,7 +639,6 @@ function sendFeedback(movieId, rank, btn) {
       clicked_rank: rank,
     })
   }).then(function(response) {
-    console.log('Feedback response status:', response.status);
     return response.json();
   }).then(function(data) {
     console.log('Feedback response data:', data);
@@ -648,10 +647,27 @@ function sendFeedback(movieId, rank, btn) {
     btn.style.color = 'var(--success)';
     btn.style.borderColor = 'var(--success)';
     btn.style.background = 'rgba(46,204,113,0.1)';
+
+    // Also send watch event to data ingest API
+    var watchDuration = Math.floor(Math.random() * (7200 - 900 + 1)) + 900;
+    fetch('/api/ingest-event', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        user_id: currentUserId || 0,
+        movie_id: String(movieId),
+        watch_duration_seconds: watchDuration,
+      })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      console.log('Ingest event sent:', d);
+    }).catch(function(e) {
+      console.error('Ingest event error:', e);
+    });
   }).catch(function(e) {
     console.error('Feedback error:', e);
   });
 }
+
 
 function fetchUserRec() {
   var c = document.getElementById('userRecResults');

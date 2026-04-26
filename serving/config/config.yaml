@@ -34,8 +34,7 @@ model_output:
 
 onnx_output:
   s3_bucket: "warehouse"
-  version_key: "models/mlp/v0002/model_mlp_best.onnx"
-  latest_key:  "models/mlp/latest/model_mlp_best.onnx"
+  staging_key: "models/mlp/staging/model_mlp_best.onnx"
 
 models:
   mlp:

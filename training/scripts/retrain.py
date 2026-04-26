@@ -441,6 +441,26 @@ def main():
             if "latest_key" in model_persist:
                 upload_model_to_s3(s3_cfg, model_save_path, bucket, model_persist["latest_key"])
 
+            onnx_out = config.get("onnx_output", {})
+            if onnx_out:
+                from pathlib import Path
+                from scripts.export_to_onnx import export_onnx, upload_onnx
+
+                onnx_path = Path("/tmp/model_mlp_best.onnx")
+                export_onnx(
+                    pt_path=Path(model_save_path),
+                    onnx_path=onnx_path,
+                    hidden_dims=model_cfg["hidden_dims"],
+                    dropout=0.0,
+                    embedding_dim=data_cfg.get("embedding_dim", 384),
+                )
+                s3_client = build_s3_client(s3_cfg)
+                staging_key = onnx_out.get("staging_key", "models/mlp/staging/model_mlp_best.onnx")
+                upload_onnx(s3_client, onnx_path, onnx_out["s3_bucket"], staging_key)
+                print(f"[retrain] ONNX uploaded to staging only: {staging_key}")
+                print("[retrain] monitor.py will handle staging → canary → prod promotion")
+
+
         print(f"\n{'='*50}")
         print(f"Retraining complete! (data: {data_version})")
         print(f"Total time: {total_time:.1f}s")
