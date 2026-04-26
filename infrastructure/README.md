@@ -51,10 +51,10 @@ No dedicated Ingress manifest is included in this initial deployment. `NodePort`
 
 Persistent storage is implemented with a mix of K3s `local-path` PVCs and direct node-local host storage.
 
-- PostgreSQL defines a PVC for database state.
+- PostgreSQL stores database state in the node-local directory `/mnt/block/postgres_data`.
 - MLflow defines a PVC for artifact storage while experiment metadata is stored in PostgreSQL.
 - Jellyfin defines a PVC for configuration retention.
-- MinIO stores object data under `/mnt/block/minio_data` on the node.
+- MinIO stores object data under `/mnt/object/minio_data` on the node.
 
 These services rely on persistent storage so that state and configuration survive pod restart events. In this initial deployment, persistence remains node-local, using `local-path` PVCs where convenient and direct host mounts where the team wants stable host directories.
 
@@ -77,6 +77,42 @@ The repository supports the following initial deployment workflow:
 4. Deploy the base shared services by applying `k8s/bootstrap`, which bundles the namespace, PostgreSQL init configmap, infrastructure services, and the role reference ConfigMaps.
 
 The Chameleon instance provisioning and access steps may include manual actions in the Chameleon environment, such as launching the instance, assigning a floating IP, and confirming security group rules. This repository documents and supports the Kubernetes-side deployment after node access is available.
+
+## New Node Preparation
+
+When deploying onto a brand-new Chameleon node, perform these preparation steps before running the bootstrap script. This is the part that is easy to overlook when moving from one node to another.
+
+1. Clone the repository to the node and enter the infrastructure directory.
+2. Install K3s on the node.
+3. Create the host directories used by node-local storage.
+4. Make sure the mount points and permissions are ready before applying the manifests.
+
+Example Linux node preparation sequence:
+
+```bash
+sudo -n true
+git clone https://github.com/jc14141-collab/Recommendation-System-for-Jellyfin.git
+cd ~/Recommendation-System-for-Jellyfin/infrastructure
+chmod +x scripts/*.sh
+
+sudo ./scripts/install-k3s-server.sh
+
+mkdir -p /mnt/object/minio_data
+mkdir -p /mnt/block/postgres_data
+
+sudo chown -R 999:999 /mnt/block/postgres_data
+sudo chmod 700 /mnt/block/postgres_data
+```
+
+If the node does not already have the expected storage mounts, verify them before continuing:
+
+```bash
+df -h
+ls -la /mnt/block
+ls -la /mnt/object
+```
+
+After this preparation, continue with the bootstrap deployment.
 
 ## Security Note
 
@@ -131,7 +167,7 @@ Use this section when starting from a new Chameleon lease or after cleaning the 
 2. Build/import/deploy the training layer
 3. Build/import/deploy the serving layer
 
-Before running the scripts, make sure the node has K3s, Docker, Git, Python, and Docker Hub login configured. If the node only has K3s' bundled kubectl, you can use:
+Before running the scripts, make sure the node has K3s, Docker, Git, Python, and Docker Hub login configured. Also make sure the node-local directories `/mnt/block/postgres_data` and `/mnt/object/minio_data` exist. If the node only has K3s' bundled kubectl, you can use:
 
 ```bash
 echo 'alias kubectl="sudo k3s kubectl"' >> ~/.bashrc
@@ -146,6 +182,11 @@ git pull origin main
 
 cd ~/Recommendation-System-for-Jellyfin/infrastructure
 chmod +x scripts/*.sh
+
+mkdir -p /mnt/object/minio_data
+mkdir -p /mnt/block/postgres_data
+sudo chown -R 999:999 /mnt/block/postgres_data
+sudo chmod 700 /mnt/block/postgres_data
 
 export POSTGRES_DB="recsys"
 export POSTGRES_USER="recsys"
@@ -314,9 +355,14 @@ From Windows PowerShell:
 After SSH access to a Chameleon node is available, use the full sequence in [Full End-to-End Deployment](#full-end-to-end-deployment) for the current project stack. The minimal bootstrap-only example below is useful when validating only the base infrastructure layer:
 
 ```bash
+git clone https://github.com/jc14141-collab/Recommendation-System-for-Jellyfin.git
 cd ~/Recommendation-System-for-Jellyfin/infrastructure
 chmod +x scripts/*.sh
 sudo ./scripts/install-k3s-server.sh
+mkdir -p /mnt/object/minio_data
+mkdir -p /mnt/block/postgres_data
+sudo chown -R 999:999 /mnt/block/postgres_data
+sudo chmod 700 /mnt/block/postgres_data
 export POSTGRES_USER="recsys"
 export POSTGRES_DB="recsys"
 export POSTGRES_PASSWORD="replace-with-a-real-password"
