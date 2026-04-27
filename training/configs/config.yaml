@@ -38,6 +38,10 @@ model_output:
   version_key: "models/mlp/v0002/model_mlp_best.pt"
   latest_key: "models/mlp/latest/model_mlp_best.pt"
 
+onnx_output:
+  s3_bucket: "warehouse"
+  staging_key: "models/mlp/staging/model_mlp_best.onnx"
+
 models:
   mlp:
     description: "MLP retrained on v0002 new user data"
