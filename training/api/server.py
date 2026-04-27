@@ -360,19 +360,19 @@ def search_movies(q: str = "", limit: int = 10):
     if not q or len(q.strip()) < 2:
         return {"results": []}
     eng = get_engine()
-    movies_df = eng.movies  # pandas DataFrame loaded by load_movies_csv()
-    mask = movies_df["title"].str.contains(q.strip(), case=False, na=False, regex=False)
-    matched = movies_df[mask].head(limit)
-    return {
-        "results": [
-            {
-                "movie_id": int(row["movieId"]),
-                "title": row["title"],
-                "genres": row.get("genres", "") if isinstance(row.get("genres"), str) else ""
-            }
-            for _, row in matched.iterrows()
-        ]
-    }
+    q_lower = q.strip().lower()
+    results = []
+    for movie_id, info in eng.movie_info.items():
+        title = info.get("title", "")
+        if q_lower in title.lower():
+            results.append({
+                "movie_id": int(movie_id),
+                "title": title,
+                "genres": info.get("genres", "")
+            })
+        if len(results) >= limit:
+            break
+    return {"results": results}
 
 
 # ── Inference Engine ──
