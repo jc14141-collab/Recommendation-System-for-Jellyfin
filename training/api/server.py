@@ -355,6 +355,25 @@ def list_datasets():
     current = config["data"].get("version", "auto")
     return {"versions": versions, "current": current}
 
+@app.get("/api/search")
+def search_movies(q: str = "", limit: int = 10):
+    if not q or len(q.strip()) < 2:
+        return {"results": []}
+    eng = get_engine()
+    movies_df = eng.movies  # pandas DataFrame loaded by load_movies_csv()
+    mask = movies_df["title"].str.contains(q.strip(), case=False, na=False, regex=False)
+    matched = movies_df[mask].head(limit)
+    return {
+        "results": [
+            {
+                "movie_id": int(row["movieId"]),
+                "title": row["title"],
+                "genres": row.get("genres", "") if isinstance(row.get("genres"), str) else ""
+            }
+            for _, row in matched.iterrows()
+        ]
+    }
+
 
 # ── Inference Engine ──
 
