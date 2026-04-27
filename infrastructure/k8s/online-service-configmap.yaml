@@ -18,9 +18,9 @@ data:
     processor_intervals:
       auth_processor_seconds: 2
       event_processor_seconds: 2
-      popular_movie_updater_seconds: 100
-      user_embedding_updater_seconds: 60
-      exporter_seconds: 100
+      popular_movie_updater_seconds: 600
+      user_embedding_updater_seconds: 600
+      exporter_seconds: 1200
 
     embedding:
       recent_events_limit: 200

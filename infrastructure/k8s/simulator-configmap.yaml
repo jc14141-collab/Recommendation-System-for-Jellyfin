@@ -15,16 +15,16 @@ data:
       base_profile_path: s3://artifacts/simulator_base_profile/simulator_base_profile.parquet
       online_user_sample_size: 120
 
-      target_online_users: 10
+      target_online_users: 3
       max_online_users: 120
 
-      tick_seconds: 3.0
-      total_ticks: 3600
+      tick_seconds: 15
+      total_ticks: 8640
 
-      login_rate_per_tick: 10
-      logout_rate_per_tick: 5
+      login_rate_per_tick: 1
+      logout_rate_per_tick: 1
 
-      global_event_rate_per_tick: 50
+      global_event_rate_per_tick: 10
       per_user_event_prob: 0.3
 
       min_events_per_session: 1
