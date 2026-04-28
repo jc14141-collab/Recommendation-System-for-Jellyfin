@@ -35,6 +35,7 @@ The final demo deployment uses two nodes with different responsibilities.
   - MLflow
   - MinIO
   - Adminer
+  - Airflow
   - training manager / retraining
   - serving / monitoring
 - Dedicated Jellyfin node
@@ -103,12 +104,12 @@ The Chameleon instance provisioning and access steps may include manual actions 
 
 When deploying onto a brand-new Chameleon node, perform these preparation steps before running the bootstrap script. This is the part that is easy to overlook when moving from one node to another.
 
-1. Clone the repository to the node and enter the infrastructure directory.
+1. Make sure the repository exists on the node and enter the infrastructure directory.
 2. Install K3s on the node.
 3. Create the host directories used by node-local storage.
 4. Make sure the mount points and permissions are ready before applying the manifests.
 
-Example Linux node preparation sequence:
+Example Linux node preparation sequence for a brand-new node without the repository yet:
 
 ```bash
 sudo -n true
@@ -123,6 +124,15 @@ mkdir -p /mnt/block/postgres_data
 
 sudo chown -R 999:999 /mnt/block/postgres_data
 sudo chmod 700 /mnt/block/postgres_data
+```
+
+If the repository is already present on the node, update it instead of cloning again:
+
+```bash
+cd ~/Recommendation-System-for-Jellyfin
+git pull origin main
+cd ~/Recommendation-System-for-Jellyfin/infrastructure
+chmod +x scripts/*.sh
 ```
 
 If the node does not already have the expected storage mounts, verify them before continuing:
@@ -144,6 +154,23 @@ The final Jellyfin used by the project is deployed separately from the Kubernete
 - deployment entrypoint in this repo: `scripts/deploy-formal-custom-jellyfin.sh`
 
 This script installs dependencies, prepares `/mnt/block/movies`, clones or updates both upstream repositories into managed directories under `~/custom-jellyfin-managed`, builds the frontend, stops any older hand-run Jellyfin process from the legacy root-directory workflow, and installs a `systemd` service named `custom-jellyfin`.
+
+If the repository is not present yet on the dedicated Jellyfin node:
+
+```bash
+git clone https://github.com/jc14141-collab/Recommendation-System-for-Jellyfin.git
+cd ~/Recommendation-System-for-Jellyfin/infrastructure
+chmod +x scripts/*.sh
+```
+
+If the repository already exists on the Jellyfin node, do not clone again. Update it in place:
+
+```bash
+cd ~/Recommendation-System-for-Jellyfin
+git pull origin main
+cd ~/Recommendation-System-for-Jellyfin/infrastructure
+chmod +x scripts/*.sh
+```
 
 ## Security Note
 
@@ -195,9 +222,10 @@ The bootstrap script:
 Use this section when starting from a new Chameleon lease or after cleaning the `mlops` namespace. The full deployment is intentionally split into four layers:
 
 1. Bootstrap infrastructure and application support services
-2. Build/import/deploy the training layer
-3. Build/import/deploy the serving layer
-4. Deploy the formal Jellyfin service on the dedicated Jellyfin node
+2. Deploy Airflow
+3. Build/import/deploy the training layer
+4. Build/import/deploy the serving layer
+5. Deploy the formal Jellyfin service on the dedicated Jellyfin node
 
 Before running the scripts, make sure the node has K3s, Docker, Git, Python, and Docker Hub login configured. Also make sure the node-local directories `/mnt/block/postgres_data` and `/mnt/object/minio_data` exist. If the node only has K3s' bundled kubectl, you can use:
 
@@ -229,16 +257,30 @@ export MINIO_ROOT_PASSWORD="minioadmin123"
 # 1. Infrastructure, shared platform services, config, and app support services.
 bash ./scripts/deploy-k8s-bootstrap.sh
 
-# 2. Training image and Kubernetes resources.
+# 2. Airflow Helm and Kubernetes resources.
+helm repo add apache-airflow https://airflow.apache.org
+helm repo update
+echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
+source ~/.bashrc
+cd ~/Recommendation-System-for-Jellyfin
+helm install airflow apache-airflow/airflow \
+  -n airflow \
+  --create-namespace
+kubectl apply -f rbac/ -R
+helm upgrade airflow apache-airflow/airflow \
+  -n airflow \
+  -f airflow/values.yaml
+
+# 3. Training image and Kubernetes resources.
 bash ./scripts/import-training-image.sh
 bash ./scripts/deploy-k8s-training.sh
 
-# 3. Serving image and Kubernetes resources.
+# 4. Serving image and Kubernetes resources.
 bash ./scripts/import-serving-image.sh
 bash ./scripts/deploy-k8s-serving.sh
 ```
 
-On the dedicated Jellyfin node, run:
+On the dedicated Jellyfin node, run from the repository infrastructure directory:
 
 ```bash
 cd ~/Recommendation-System-for-Jellyfin/infrastructure
@@ -252,6 +294,8 @@ Validate the full deployment:
 kubectl get pods -n mlops
 kubectl get svc -n mlops
 kubectl get cronjob -n mlops
+kubectl get pods -n airflow
+kubectl get svc -n airflow
 ```
 
 Core local health checks from the node:
@@ -267,6 +311,7 @@ curl -i http://127.0.0.1:31080/health
 Expected external endpoints use the node or floating IP:
 
 - MLflow: `http://<node-ip>:30500`
+- Airflow: `http://<node-ip>:30080/dags`
 - Jellyfin: `http://<jellyfin-node-ip>:8096/web/#/home`
 - MinIO API: `http://<node-ip>:30900`
 - MinIO Console: `http://<node-ip>:30901`
@@ -314,6 +359,50 @@ sudo systemctl restart custom-jellyfin
 journalctl -u custom-jellyfin -f
 ```
 
+## Airflow Deployment
+
+Airflow is deployed on the main platform node after the bootstrap layer is ready.
+
+The current repository-managed deployment flow is:
+
+```bash
+helm repo add apache-airflow https://airflow.apache.org
+helm repo update
+echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
+source ~/.bashrc
+
+cd ~/Recommendation-System-for-Jellyfin
+
+helm install airflow apache-airflow/airflow \
+  -n airflow \
+  --create-namespace
+
+kubectl apply -f rbac/ -R
+
+helm upgrade airflow apache-airflow/airflow \
+  -n airflow \
+  -f airflow/values.yaml
+```
+
+This flow uses:
+
+- `airflow/Dockerfile`
+- `airflow/values.yaml`
+- `airflow/dags/`
+- `rbac/airflow-sa.yaml`
+- `rbac/airflow-job-trigger.yaml`
+- `rbac/airflow-secrets.yaml`
+- `rbac/airflow-api-nodeport.yaml`
+
+After deployment, the expected external UI is:
+
+- Airflow: `http://<node-ip>:30080/dags`
+
+Default login:
+
+- username: `admin`
+- password: `admin123`
+
 ## Training Deployment
 
 Training is deployed separately from the infrastructure bootstrap. The current training-layer resources are:
@@ -351,8 +440,9 @@ The training manager service is exposed on NodePort `30089`, and the scheduled r
 The end-to-end ops flow is now:
 
 1. Run `bash ./scripts/deploy-k8s-bootstrap.sh`
-2. Run `./scripts/import-training-image.sh`
-3. Run `bash ./scripts/deploy-k8s-training.sh`
+2. Deploy Airflow with Helm and the `rbac/` manifests
+3. Run `./scripts/import-training-image.sh`
+4. Run `bash ./scripts/deploy-k8s-training.sh`
 
 If the secrets already exist in the cluster, you can skip secret creation:
 
@@ -431,7 +521,13 @@ From Windows PowerShell:
 After SSH access to a Chameleon node is available, use the full sequence in [Full End-to-End Deployment](#full-end-to-end-deployment) for the current project stack. The minimal bootstrap-only example below is useful when validating only the base infrastructure layer:
 
 ```bash
-git clone https://github.com/jc14141-collab/Recommendation-System-for-Jellyfin.git
+if [ ! -d ~/Recommendation-System-for-Jellyfin/.git ]; then
+  git clone https://github.com/jc14141-collab/Recommendation-System-for-Jellyfin.git
+else
+  cd ~/Recommendation-System-for-Jellyfin
+  git pull origin main
+fi
+
 cd ~/Recommendation-System-for-Jellyfin/infrastructure
 chmod +x scripts/*.sh
 sudo ./scripts/install-k3s-server.sh
@@ -441,9 +537,9 @@ sudo chown -R 999:999 /mnt/block/postgres_data
 sudo chmod 700 /mnt/block/postgres_data
 export POSTGRES_USER="recsys"
 export POSTGRES_DB="recsys"
-export POSTGRES_PASSWORD="replace-with-a-real-password"
+export POSTGRES_PASSWORD="recsys123"
 export MINIO_ROOT_USER="minioadmin"
-export MINIO_ROOT_PASSWORD="replace-with-a-real-password"
+export MINIO_ROOT_PASSWORD="minioadmin123"
 ./scripts/deploy-k8s-bootstrap.sh
 kubectl get pods -n mlops
 kubectl get svc -n mlops
@@ -461,6 +557,7 @@ This helper script copies the repository to the remote node, installs K3s unless
 Expected external endpoints for the full deployment:
 
 - MLflow: `http://<floating-ip>:30500`
+- Airflow: `http://<floating-ip>:30080/dags`
 - Jellyfin: `http://<jellyfin-floating-ip>:8096/web/#/home`
 - MinIO API: `http://<floating-ip>:30900`
 - MinIO Console: `http://<floating-ip>:30901`
