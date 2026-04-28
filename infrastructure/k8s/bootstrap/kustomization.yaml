@@ -6,7 +6,6 @@ resources:
   - ../01-postgres-initdb.yaml
   - ../01-postgres.yaml
   - ../02-mlflow.yaml
-  - ../03-jellyfin.yaml
   - ../04-minio.yaml
   - ../05-minio-init.yaml
   - ../06-adminer.yaml

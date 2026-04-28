@@ -9,7 +9,7 @@ This document enumerates the containers and containerized systems currently invo
 | DevOps / Platform | Namespace | Shared Kubernetes namespace for the project platform | Repository-native platform design | [`k8s/10-devops-platform-components.yaml`](../k8s/10-devops-platform-components.yaml) | Implemented in `mlops` |
 | DevOps / Platform | PostgreSQL | Shared relational database for platform state and application data | [`postgres` in `docker-data.yml`](../../docker-data.yml) | [`k8s/01-postgres.yaml`](../k8s/01-postgres.yaml) | Implemented in `mlops` |
 | DevOps / Platform | MLflow | Experiment tracking and model artifact metadata | Repository-native deployment in this infrastructure repo | [`k8s/02-mlflow.yaml`](../k8s/02-mlflow.yaml) | Implemented in `mlops` |
-| DevOps / Platform | Jellyfin | Media application used by the project demo | Repository-native deployment in this infrastructure repo | [`k8s/03-jellyfin.yaml`](../k8s/03-jellyfin.yaml) | Implemented in `mlops` |
+| DevOps / Platform | Jellyfin | Media application used by the project demo | Frontend: `Teqqquila/JF-frontend`, backend: official `jellyfin/jellyfin` | [`scripts/deploy-formal-custom-jellyfin.sh`](../scripts/deploy-formal-custom-jellyfin.sh) | Implemented as host-level `systemd` service on the dedicated Jellyfin node |
 | DevOps / Platform | MinIO | Shared object storage platform service used by data and training workflows | [`minio` in `docker-data.yml`](../../docker-data.yml) | [`k8s/04-minio.yaml`](../k8s/04-minio.yaml) | Kubernetes manifest prepared |
 | DevOps / Platform | MinIO bucket init | Platform-side bucket initialization support for object storage | [`minio-init` in `docker-data.yml`](../../docker-data.yml) | [`k8s/05-minio-init.yaml`](../k8s/05-minio-init.yaml) | Kubernetes manifest prepared |
 | DevOps / Platform | Adminer | Shared PostgreSQL inspection UI for debugging and validation | [`adminer` in `docker-data.yml`](../../docker-data.yml) | [`k8s/06-adminer.yaml`](../k8s/06-adminer.yaml) | Kubernetes manifest prepared |
@@ -34,7 +34,7 @@ This document enumerates the containers and containerized systems currently invo
 
 ## Summary Notes
 
-- The current DevOps / Platform deployment already implements the shared namespace and core platform services: PostgreSQL, MLflow, and Jellyfin.
+- The current DevOps / Platform deployment already implements the shared namespace and core platform services: PostgreSQL and MLflow in Kubernetes, plus Jellyfin as a dedicated host-level service on the Jellyfin node.
 - The DevOps / Platform role mapping is summarized separately in [`k8s/10-devops-platform-components.yaml`](../k8s/10-devops-platform-components.yaml) so that platform-owned services are visually separated from role-owned application containers.
 - The data-role infrastructure pieces with clear platform ownership boundaries, especially MinIO, MinIO initialization, and Adminer, already have direct Kubernetes-side equivalents in this repository.
 - The remaining data-role, training-role, and serving-role systems have valid Docker-side sources and now have explicit Kubernetes-equivalent reference manifests documenting how the platform layer will support them.

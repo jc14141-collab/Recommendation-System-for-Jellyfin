@@ -24,11 +24,9 @@ data:
         - Deployment
       implemented_in_repo: k8s/02-mlflow.yaml
     jellyfin:
-      kubernetes_equivalent:
-        - PersistentVolumeClaim
-        - Service
-        - Deployment
-      implemented_in_repo: k8s/03-jellyfin.yaml
+      deployment_form:
+        - Host systemd service
+      implemented_in_repo: scripts/deploy-formal-custom-jellyfin.sh
     minio:
       kubernetes_equivalent:
         - PersistentVolumeClaim

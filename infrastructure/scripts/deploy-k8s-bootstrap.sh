@@ -13,12 +13,11 @@ Usage: ./scripts/deploy-k8s-bootstrap.sh [--skip-secret-setup] [--timeout 300s]
 
 Apply the Kubernetes manifests in three phases:
 
-Phase 1: Infrastructure (00-06)
+Phase 1: Infrastructure (00-02, 04-06)
   00-namespace.yaml
   01-postgres-initdb.yaml
   01-postgres.yaml
   02-mlflow.yaml
-  03-jellyfin.yaml
   04-minio.yaml
   05-minio-init.yaml
   06-adminer.yaml
@@ -103,7 +102,6 @@ INFRA_MANIFESTS=(
   "$REPO_ROOT/k8s/01-postgres-initdb.yaml"
   "$REPO_ROOT/k8s/01-postgres.yaml"
   "$REPO_ROOT/k8s/02-mlflow.yaml"
-  "$REPO_ROOT/k8s/03-jellyfin.yaml"
   "$REPO_ROOT/k8s/04-minio.yaml"
   "$REPO_ROOT/k8s/05-minio-init.yaml"
   "$REPO_ROOT/k8s/06-adminer.yaml"
@@ -148,7 +146,6 @@ apply_manifest_phase "Phase 1: Infrastructure" "${INFRA_MANIFESTS[@]}"
 
 kubectl rollout status statefulset/postgres -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 kubectl rollout status deployment/mlflow -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
-kubectl rollout status deployment/jellyfin -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 kubectl rollout status deployment/minio -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 kubectl rollout status deployment/adminer -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"
 kubectl wait --for=condition=complete job/minio-init -n "$NAMESPACE" --timeout="$WAIT_TIMEOUT"

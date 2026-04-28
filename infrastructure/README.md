@@ -1,6 +1,6 @@
 # Infrastructure Repository for Jellyfin Recommender Initial Deployment
 
-This repository contains the infrastructure and deployment materials used for the initial Chameleon-based deployment of the Jellyfin recommender project. It is intended to serve as an infrastructure repository for course submission and documents how the team configured a K3s-based Kubernetes environment and deployed the initial shared services required by the project.
+This repository contains the infrastructure and deployment materials used for the Chameleon-based deployment of the Jellyfin recommender project. It documents both the K3s-based shared platform on the main node and the dedicated host-level Jellyfin deployment used by the current live demo.
 
 ## Repository Purpose
 
@@ -10,7 +10,8 @@ This repository is focused on:
 - K3s installation and Kubernetes cluster setup
 - Kubernetes namespace and service deployment materials
 - Persistent storage configuration for node-local services
-- Deployment manifests for shared platform services and the open-source service used by the project
+- Deployment manifests for shared platform services
+- A formal deployment script for the custom Jellyfin frontend currently used by the project
 
 The repository is intentionally scoped to the initial deployment stage. It is designed to be readable, reproducible, and suitable for packaging as course infrastructure submission material.
 
@@ -24,6 +25,25 @@ The repository is intentionally scoped to the initial deployment stage. It is de
 
 The current repository reflects a working initial deployment for early integration and demonstration. It is not presented as a final production-hardened platform configuration.
 
+## Current Two-Node Layout
+
+The final demo deployment uses two nodes with different responsibilities.
+
+- Main platform node
+  Runs the shared K3s platform and the Kubernetes-managed services:
+  - PostgreSQL
+  - MLflow
+  - MinIO
+  - Adminer
+  - training manager / retraining
+  - serving / monitoring
+- Dedicated Jellyfin node
+  Runs only the final Jellyfin service through `custom-jellyfin.service` using:
+  - frontend: `Teqqquila/JF-frontend`
+  - backend: official `jellyfin/jellyfin`
+
+This means the main platform deployment and the Jellyfin deployment are intentionally executed on different nodes.
+
 ## Services Deployed
 
 - PostgreSQL
@@ -31,7 +51,7 @@ The current repository reflects a working initial deployment for early integrati
 - MLflow
   Platform service for experiment tracking and artifact management. In this repository, MLflow stores metadata in PostgreSQL and artifacts on a PVC-backed filesystem path.
 - Jellyfin
-  Open-source service used by the project and deployed in Kubernetes for demonstration.
+  Custom Jellyfin frontend plus official Jellyfin backend, deployed as a dedicated host-level service on the Jellyfin node.
 - MinIO
   S3-compatible object storage used by the data engineering services defined in the compose file.
 - Adminer
@@ -39,11 +59,11 @@ The current repository reflects a working initial deployment for early integrati
 
 ## Networking Model
 
-The current initial deployment uses a simple service exposure model:
+The current shared-platform deployment uses a simple service exposure model:
 
 - PostgreSQL uses `ClusterIP` and is intended for internal cluster access only.
 - MLflow uses `NodePort` `30500`.
-- Jellyfin uses `NodePort` `30096`.
+- Jellyfin is not part of the Kubernetes bootstrap flow. The final live Jellyfin runs as a host-level service and listens on `8096` on the dedicated Jellyfin node.
 
 No dedicated Ingress manifest is included in this initial deployment. `NodePort` is used as the external access method where browser access is needed for demonstration and validation.
 
@@ -53,7 +73,7 @@ Persistent storage is implemented with a mix of K3s `local-path` PVCs and direct
 
 - PostgreSQL stores database state in the node-local directory `/mnt/block/postgres_data`.
 - MLflow defines a PVC for artifact storage while experiment metadata is stored in PostgreSQL.
-- Jellyfin defines a PVC for configuration retention.
+- Jellyfin watches `/mnt/block/movies` on the dedicated Jellyfin node and stores runtime state under the service user's home directory.
 - MinIO stores object data under `/mnt/object/minio_data` on the node.
 
 These services rely on persistent storage so that state and configuration survive pod restart events. In this initial deployment, persistence remains node-local, using `local-path` PVCs where convenient and direct host mounts where the team wants stable host directories.
@@ -75,6 +95,7 @@ The repository supports the following initial deployment workflow:
 2. Install K3s on the primary node using `scripts/install-k3s-server.sh`.
 3. If additional nodes are used, join them with `scripts/install-k3s-agent.sh`.
 4. Deploy the base shared services by applying `k8s/bootstrap`, which bundles the namespace, PostgreSQL init configmap, infrastructure services, and the role reference ConfigMaps.
+5. On the dedicated Jellyfin node, run `scripts/deploy-formal-custom-jellyfin.sh`.
 
 The Chameleon instance provisioning and access steps may include manual actions in the Chameleon environment, such as launching the instance, assigning a floating IP, and confirming security group rules. This repository documents and supports the Kubernetes-side deployment after node access is available.
 
@@ -114,6 +135,16 @@ ls -la /mnt/object
 
 After this preparation, continue with the bootstrap deployment.
 
+## Dedicated Jellyfin Node Preparation
+
+The final Jellyfin used by the project is deployed separately from the Kubernetes bootstrap manifests.
+
+- frontend source: `https://github.com/Teqqquila/JF-frontend.git`
+- backend source: `https://github.com/jellyfin/jellyfin.git`
+- deployment entrypoint in this repo: `scripts/deploy-formal-custom-jellyfin.sh`
+
+This script installs dependencies, prepares `/mnt/block/movies`, clones or updates both upstream repositories into managed directories under `~/custom-jellyfin-managed`, builds the frontend, stops any older hand-run Jellyfin process from the legacy root-directory workflow, and installs a `systemd` service named `custom-jellyfin`.
+
 ## Security Note
 
 Real secrets are not stored in this repository.
@@ -145,9 +176,9 @@ export MINIO_ROOT_PASSWORD="replace-with-a-real-password"
 The bootstrap script:
 
 - creates or updates `postgres-secret` and `minio-secret`
-- applies the infrastructure manifests `00-06`
+- applies the infrastructure manifests `00-02`, `04-06`
 - recreates the one-shot `minio-init` job cleanly
-- waits for PostgreSQL, MLflow, Jellyfin, MinIO, and Adminer to become ready
+- waits for PostgreSQL, MLflow, MinIO, and Adminer to become ready
 - applies the config manifests after `16`:
   - `postgres-initdb.yaml`
   - `data-configmap.yaml`
@@ -161,11 +192,12 @@ The bootstrap script:
 
 ## Full End-to-End Deployment
 
-Use this section when starting from a new Chameleon lease or after cleaning the `mlops` namespace. The full deployment is intentionally split into three layers:
+Use this section when starting from a new Chameleon lease or after cleaning the `mlops` namespace. The full deployment is intentionally split into four layers:
 
 1. Bootstrap infrastructure and application support services
 2. Build/import/deploy the training layer
 3. Build/import/deploy the serving layer
+4. Deploy the formal Jellyfin service on the dedicated Jellyfin node
 
 Before running the scripts, make sure the node has K3s, Docker, Git, Python, and Docker Hub login configured. Also make sure the node-local directories `/mnt/block/postgres_data` and `/mnt/object/minio_data` exist. If the node only has K3s' bundled kubectl, you can use:
 
@@ -174,7 +206,7 @@ echo 'alias kubectl="sudo k3s kubectl"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-Then run the complete deployment sequence from the repository root:
+Then run the complete deployment sequence from the repository root on the main platform node:
 
 ```bash
 cd ~/Recommendation-System-for-Jellyfin
@@ -206,6 +238,14 @@ bash ./scripts/import-serving-image.sh
 bash ./scripts/deploy-k8s-serving.sh
 ```
 
+On the dedicated Jellyfin node, run:
+
+```bash
+cd ~/Recommendation-System-for-Jellyfin/infrastructure
+chmod +x scripts/*.sh
+bash ./scripts/deploy-formal-custom-jellyfin.sh
+```
+
 Validate the full deployment:
 
 ```bash
@@ -227,7 +267,7 @@ curl -i http://127.0.0.1:31080/health
 Expected external endpoints use the node or floating IP:
 
 - MLflow: `http://<node-ip>:30500`
-- Jellyfin: `http://<node-ip>:30096`
+- Jellyfin: `http://<jellyfin-node-ip>:8096/web/#/home`
 - MinIO API: `http://<node-ip>:30900`
 - MinIO Console: `http://<node-ip>:30901`
 - Training Manager: `http://<node-ip>:30089`
@@ -237,6 +277,42 @@ Expected external endpoints use the node or floating IP:
 - Serving canary: `http://<node-ip>:30084`
 - Prometheus: `http://<node-ip>:30090`
 - Grafana: `http://<node-ip>:30030`
+
+## Formal Jellyfin Deployment
+
+The current live Jellyfin is intentionally managed outside the Kubernetes bootstrap flow. The old Kubernetes manifest `k8s/03-jellyfin.yaml` is retained only as a legacy reference and is no longer applied by the main bootstrap scripts.
+
+The formal deployment script is:
+
+```bash
+./scripts/deploy-formal-custom-jellyfin.sh
+```
+
+It performs the following steps:
+
+1. installs Linux dependencies
+2. ensures Node.js 24 is available
+3. installs the matching `.NET` SDK channel required by the current official Jellyfin backend
+4. clones or updates:
+   - `https://github.com/Teqqquila/JF-frontend.git`
+   - `https://github.com/jellyfin/jellyfin.git`
+5. builds the frontend with `npm ci` and `npm run build:production`
+6. prepares `/mnt/block/movies` for the demo media library
+7. stops older hand-run Jellyfin processes from the legacy root-directory workflow if they are still running
+8. installs and starts a host-level `systemd` service named `custom-jellyfin`
+
+To avoid overwriting ad-hoc working copies, the script uses managed directories:
+
+- `~/custom-jellyfin-managed/jellyfin-web`
+- `~/custom-jellyfin-managed/jellyfin`
+
+Useful commands after deployment:
+
+```bash
+sudo systemctl status custom-jellyfin
+sudo systemctl restart custom-jellyfin
+journalctl -u custom-jellyfin -f
+```
 
 ## Training Deployment
 
@@ -380,12 +456,12 @@ If you are deploying from a local Windows PowerShell terminal to a Chameleon ins
 .\scripts\deploy-chameleon.ps1 -FloatingIp 129.114.25.219 -PostgresPassword "replace-with-a-real-password"
 ```
 
-This helper script copies the repository to the remote node, installs K3s unless `-SkipK3sInstall` is supplied, creates the PostgreSQL secret, applies the bootstrap manifests, and waits for the base infrastructure services to become ready.
+This helper script copies the repository to the remote node, installs K3s unless `-SkipK3sInstall` is supplied, creates the PostgreSQL secret, applies the bootstrap manifests, and waits for the base infrastructure services to become ready. It does not deploy Jellyfin.
 
 Expected external endpoints for the full deployment:
 
 - MLflow: `http://<floating-ip>:30500`
-- Jellyfin: `http://<floating-ip>:30096`
+- Jellyfin: `http://<jellyfin-floating-ip>:8096/web/#/home`
 - MinIO API: `http://<floating-ip>:30900`
 - MinIO Console: `http://<floating-ip>:30901`
 - Adminer: `http://<floating-ip>:5050`

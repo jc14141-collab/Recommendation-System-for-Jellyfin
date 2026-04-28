@@ -48,7 +48,6 @@ $infraManifests = @(
     (Join-Path $repoRoot "k8s\01-postgres-initdb.yaml"),
     (Join-Path $repoRoot "k8s\01-postgres.yaml"),
     (Join-Path $repoRoot "k8s\02-mlflow.yaml"),
-    (Join-Path $repoRoot "k8s\03-jellyfin.yaml"),
     (Join-Path $repoRoot "k8s\04-minio.yaml"),
     (Join-Path $repoRoot "k8s\05-minio-init.yaml"),
     (Join-Path $repoRoot "k8s\06-adminer.yaml")
@@ -102,7 +101,6 @@ Apply-ManifestPhase -Phase "Phase 1: Infrastructure" -Files $infraManifests
 
 kubectl rollout status statefulset/postgres -n $Namespace --timeout=$Timeout
 kubectl rollout status deployment/mlflow -n $Namespace --timeout=$Timeout
-kubectl rollout status deployment/jellyfin -n $Namespace --timeout=$Timeout
 kubectl rollout status deployment/minio -n $Namespace --timeout=$Timeout
 kubectl rollout status deployment/adminer -n $Namespace --timeout=$Timeout
 kubectl wait --for=condition=complete job/minio-init -n $Namespace --timeout=$Timeout
